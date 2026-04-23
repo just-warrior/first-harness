@@ -1,0 +1,137 @@
+/* ── Two-column layout ───────────────────────────────────────── */
+.calc-layout {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+}
+
+.calc-main {
+    flex: 0 0 auto;
+    width: 280px;
+}
+
+/* ── Expression display ──────────────────────────────────────── */
+.calc-display-wrap {
+    margin-bottom: 10px;
+}
+
+.calc-display {
+    width: 100%;
+    box-sizing: border-box;
+    text-align: right;
+    font-size: 1.4em;
+    font-family: monospace, monospace;
+    background: #f4f5f7;
+    border-color: #dfe1e6;
+    cursor: default;
+}
+
+.calc-display:focus {
+    outline: none;
+    box-shadow: none;
+    border-color: #dfe1e6;
+}
+
+/* ── 4-column button grid ────────────────────────────────────── */
+.calc-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 52px;
+    gap: 6px;
+}
+
+.calc-grid .aui-button {
+    width: 100%;
+    height: 100%;
+    font-size: 1.05em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: 0;
+    transition: background 0.1s, color 0.1s;
+}
+
+.calc-grid .aui-button:active {
+    transform: scale(0.95);
+}
+
+/* Clear button — red/danger palette */
+.calc-grid .aui-button.calc-btn-clear {
+    background: #ffebe6;
+    color: #bf2600;
+    border-color: #ff8f73;
+}
+
+.calc-grid .aui-button.calc-btn-clear:hover {
+    background: #ff8f73;
+    color: #fff;
+    border-color: #ff7452;
+}
+
+/* Operator buttons — blue palette */
+.calc-grid .aui-button.calc-btn-op {
+    background: #deebff;
+    color: #0052cc;
+    border-color: #4c9aff;
+}
+
+.calc-grid .aui-button.calc-btn-op:hover {
+    background: #4c9aff;
+    color: #fff;
+    border-color: #2684ff;
+}
+
+/* 0 key: spans 2 columns */
+.calc-btn-wide {
+    grid-column: span 2;
+}
+
+/* + and = keys: span 2 rows */
+.calc-btn-tall {
+    grid-row: span 2;
+}
+
+/* ── History panel ───────────────────────────────────────────── */
+.calc-history {
+    flex: 1 1 auto;
+    min-width: 200px;
+    max-width: 320px;
+    padding: 16px;
+    background: #f4f5f7;
+    border: 1px solid #dfe1e6;
+    border-radius: 3px;
+}
+
+.calc-history-heading {
+    margin: 0 0 10px;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: #42526e;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.calc-history-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.calc-history-list li {
+    padding: 6px 8px;
+    font-family: monospace, monospace;
+    font-size: 0.9em;
+    color: #172b4d;
+    border-bottom: 1px solid #dfe1e6;
+}
+
+.calc-history-list li:last-child {
+    border-bottom: none;
+}
+
+.calc-history-empty {
+    color: #97a0af;
+    font-style: italic;
+    font-family: sans-serif;
+}

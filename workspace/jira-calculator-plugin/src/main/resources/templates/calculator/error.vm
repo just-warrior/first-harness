@@ -1,0 +1,42 @@
+<html>
+<head>
+    <title>$i18n.getText("calculator.page.title")</title>
+    <meta name="decorator" content="atl.admin"/>
+    <meta name="admin.active.section" content="admin_plugins_menu/calculator-section"/>
+    $webResourceManager.requireResource("${atlassian.plugin.key}:calculator-resources")
+</head>
+<body>
+
+<header class="aui-page-header">
+    <div class="aui-page-header-inner">
+        <div class="aui-page-header-main">
+            <h1>$i18n.getText("calculator.page.title")</h1>
+        </div>
+    </div>
+</header>
+
+<div class="aui-page-panel">
+    <div class="aui-page-panel-inner">
+        <section class="aui-page-panel-content">
+
+            <div class="aui-message aui-message-error">
+                <p class="title"><strong>$i18n.getText("calculator.error.title")</strong></p>
+                #if ($action.hasErrors())
+                    #foreach ($error in $action.errorMessages)
+                    <p>$error</p>
+                    #end
+                #else
+                <p>$i18n.getText("calculator.error.generic")</p>
+                #end
+            </div>
+
+            <p><a href="${req.contextPath}/secure/CalculatorAction!default.jspa">
+                $i18n.getText("calculator.error.back")
+            </a></p>
+
+        </section>
+    </div>
+</div>
+
+</body>
+</html>

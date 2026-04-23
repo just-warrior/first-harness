@@ -1,0 +1,52 @@
+<atlassian-plugin key="${atlassian.plugin.key}" name="${project.name}" plugins-version="2">
+    <plugin-info>
+        <description>${project.description}</description>
+        <version>${project.version}</version>
+        <vendor name="${project.organization.name}" url="${project.organization.url}" />
+        <param name="plugin-icon">images/pluginIcon.png</param>
+        <param name="plugin-logo">images/pluginLogo.png</param>
+    </plugin-info>
+
+    <!-- add our i18n resource -->
+    <resource type="i18n" name="i18n" location="jira-calculator-plugin"/>
+    
+    <!-- Web Resources: requireResource("${atlassian.plugin.key}:calculator-resources")로만 로드됨 -->
+    <web-resource key="calculator-resources" name="Calculator Web Resources">
+        <dependency>com.atlassian.auiplugin:ajs</dependency>
+        <dependency>com.atlassian.auiplugin:aui-core</dependency>
+
+        <resource type="download" name="jira-calculator-plugin.css" location="/css/jira-calculator-plugin.css"/>
+        <resource type="download" name="jira-calculator-plugin.js" location="/js/jira-calculator-plugin.js"/>
+        <resource type="download" name="pluginIcon.png" location="/images/pluginIcon.png"/>
+        <resource type="download" name="pluginLogo.png" location="/images/pluginLogo.png"/>
+    </web-resource>
+
+    <!-- Admin 메뉴 섹션: Skill 3 표준 — admin_plugins_menu 위치 -->
+    <web-section key="calculator-section"
+                 name="Calculator Section"
+                 location="admin_plugins_menu"
+                 weight="100">
+        <label key="calculator.menu.section.label"/>
+    </web-section>
+
+    <!-- Admin 메뉴 아이템: PITFALL-01 준수 — !default.jspa suffix 사용 -->
+    <web-item key="calculator-web-item"
+              name="Calculator"
+              section="admin_plugins_menu"
+              weight="200">
+        <label key="calculator.menu.item.label"/>
+        <link linkId="calculator-link">/secure/CalculatorAction!default.jspa</link>
+    </web-item>
+
+    <!-- WebWork1 Action 등록 -->
+    <webwork1 key="calculator-webwork" name="Calculator Webwork" roles-required="admin">
+        <actions>
+            <action name="com.example.jiracalculator.action.CalculatorAction" alias="CalculatorAction">
+                <view name="success">/templates/calculator/calculator.vm</view>
+                <view name="input">/templates/calculator/calculator.vm</view>
+                <view name="error">/templates/calculator/error.vm</view>
+            </action>
+        </actions>
+    </webwork1>
+
+</atlassian-plugin>

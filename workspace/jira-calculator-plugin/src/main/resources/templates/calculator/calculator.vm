@@ -1,0 +1,82 @@
+<html>
+<head>
+    <title>$i18n.getText("calculator.page.title")</title>
+    <meta name="decorator" content="atl.admin"/>
+    <meta name="admin.active.section" content="admin_plugins_menu/calculator-section"/>
+    $webResourceManager.requireResource("${atlassian.plugin.key}:calculator-resources")
+</head>
+<body>
+
+<header class="aui-page-header">
+    <div class="aui-page-header-inner">
+        <div class="aui-page-header-main">
+            <h1>$i18n.getText("calculator.page.title")</h1>
+        </div>
+    </div>
+</header>
+
+<div class="aui-page-panel">
+    <div class="aui-page-panel-inner">
+        <section class="aui-page-panel-content">
+
+            <div class="calc-layout">
+
+                <!-- Left: Calculator keypad -->
+                <div class="calc-main">
+                    <div class="calc-display-wrap">
+                        <input type="text"
+                               id="calc-expression"
+                               class="text calc-display"
+                               readonly
+                               value=""
+                               placeholder="0"
+                               aria-label="Calculator display"/>
+                    </div>
+
+                    <div class="calc-grid">
+                        <button class="aui-button calc-btn-clear"            data-value="C">C</button>
+                        <button class="aui-button calc-btn-op"               data-value="/">/</button>
+                        <button class="aui-button calc-btn-op"               data-value="*">*</button>
+                        <button class="aui-button calc-btn-op"               data-value="-">-</button>
+
+                        <button class="aui-button"                           data-value="7">7</button>
+                        <button class="aui-button"                           data-value="8">8</button>
+                        <button class="aui-button"                           data-value="9">9</button>
+                        <button class="aui-button calc-btn-op calc-btn-tall" data-value="+">+</button>
+
+                        <button class="aui-button"                           data-value="4">4</button>
+                        <button class="aui-button"                           data-value="5">5</button>
+                        <button class="aui-button"                           data-value="6">6</button>
+
+                        <button class="aui-button"                           data-value="1">1</button>
+                        <button class="aui-button"                           data-value="2">2</button>
+                        <button class="aui-button"                           data-value="3">3</button>
+                        <button class="aui-button aui-button-primary calc-btn-tall" data-value="=">=</button>
+
+                        <button class="aui-button calc-btn-wide"             data-value="0">0</button>
+                        <button class="aui-button"                           data-value=".">.</button>
+                    </div>
+                </div><!-- /.calc-main -->
+
+                <!-- Right: Calculation history (max 5, updated by JS) -->
+                <div class="calc-history">
+                    <h3 class="calc-history-heading">$i18n.getText("calculator.history.title")</h3>
+                    <ul id="calc-history-list" class="calc-history-list">
+                        #if ($action.history && !$action.history.isEmpty())
+                            #foreach ($entry in $action.history)
+                            <li>$entry</li>
+                            #end
+                        #else
+                        <li class="calc-history-empty">$i18n.getText("calculator.history.empty")</li>
+                        #end
+                    </ul>
+                </div><!-- /.calc-history -->
+
+            </div><!-- /.calc-layout -->
+
+        </section>
+    </div>
+</div>
+
+</body>
+</html>

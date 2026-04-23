@@ -1,0 +1,13 @@
+target/
+.idea/
+*.iml
+*.log
+.DS_Store
+
+# Harness state and backups
+.status/
+archive/
+
+# Jira Plugin Build outputs
+workspace/target/
+workspace/.osgi-plugins/
