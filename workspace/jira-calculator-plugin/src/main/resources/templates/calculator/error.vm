@@ -1,42 +1,41 @@
 <html>
 <head>
-    <title>$i18n.getText("calculator.page.title")</title>
+    <title>$i18n.getText("page.title") - Error</title>
     <meta name="decorator" content="atl.admin"/>
     <meta name="admin.active.section" content="admin_plugins_menu/calculator-section"/>
-    $webResourceManager.requireResource("${atlassian.plugin.key}:calculator-resources")
 </head>
 <body>
+<section id="content" role="main">
+    <header class="aui-page-header">
+        <div class="aui-page-header-inner">
+            <div class="aui-page-header-main">
+                <h1>$i18n.getText("page.title")</h1>
+            </div>
+        </div>
+    </header>
 
-<header class="aui-page-header">
-    <div class="aui-page-header-inner">
-        <div class="aui-page-header-main">
-            <h1>$i18n.getText("calculator.page.title")</h1>
+    <div class="aui-page-panel">
+        <div class="aui-page-panel-inner">
+            <div class="aui-page-panel-content">
+
+                <div class="aui-message aui-message-error">
+                    <p class="title"><strong>Error</strong></p>
+                    #if($errorMessages && $errorMessages.size() > 0)
+                        #foreach($msg in $errorMessages)
+                            <p>$msg</p>
+                        #end
+                    #else
+                        <p>An unexpected error occurred. Please try again.</p>
+                    #end
+                </div>
+
+                <p>
+                    <a href="/secure/CalculatorAction!default.jspa" class="aui-button">Return to Calculator</a>
+                </p>
+
+            </div>
         </div>
     </div>
-</header>
-
-<div class="aui-page-panel">
-    <div class="aui-page-panel-inner">
-        <section class="aui-page-panel-content">
-
-            <div class="aui-message aui-message-error">
-                <p class="title"><strong>$i18n.getText("calculator.error.title")</strong></p>
-                #if ($action.hasErrors())
-                    #foreach ($error in $action.errorMessages)
-                    <p>$error</p>
-                    #end
-                #else
-                <p>$i18n.getText("calculator.error.generic")</p>
-                #end
-            </div>
-
-            <p><a href="${req.contextPath}/secure/CalculatorAction!default.jspa">
-                $i18n.getText("calculator.error.back")
-            </a></p>
-
-        </section>
-    </div>
-</div>
-
+</section>
 </body>
 </html>

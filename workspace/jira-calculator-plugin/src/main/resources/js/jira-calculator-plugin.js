@@ -1,171 +1,191 @@
-AJS.$(function ($) {
-    'use strict';
+(function($) {
+    "use strict";
 
-    var expression = '';
-    var justCalculated = false;
-    var history = [];
+    $(function() {
+        var currentOperand1 = '';
+        var operator = '';
+        var currentOperand2 = '';
+        var isEnteringSecond = false;
+        var history = [];
 
-    // ── Helpers ─────────────────────────────────────────────────────────────
+        var $display = $('#calc-display');
+        var $historyList = $('#history-list');
 
-    function isOperator(ch) {
-        return ch === '+' || ch === '-' || ch === '*' || ch === '/';
-    }
+        function updateDisplay(value) {
+            $display.val(value || '0');
+        }
 
-    function updateDisplay(val) {
-        var $d = $('#calc-expression');
-        $d.val(val);
-        $d.attr('placeholder', val === '' ? '0' : '');
-    }
+        function getDisplayOp(op) {
+            const opMap = { '*': '×', '/': '÷', '-': '−', '+': '+' };
+            return opMap[op] || op;
+        }
 
-    function formatResult(n) {
-        // Round to 10 decimal places to suppress floating-point noise
-        return String(Math.round(n * 1e10) / 1e10);
-    }
+        function handleDigit(n) {
+            if (isEnteringSecond) {
+                currentOperand2 += n;
+                updateDisplay(currentOperand1 + ' ' + getDisplayOp(operator) + ' ' + currentOperand2);
+            } else {
+                currentOperand1 += n;
+                updateDisplay(currentOperand1);
+            }
+        }
 
-    // ── Safe recursive-descent expression evaluator (no eval) ───────────────
+        function handleOperator(op) {
+            if (!currentOperand1) return;
+            if (isEnteringSecond && currentOperand2) {
+                // If user clicks another operator after entering full expression, calculate first
+                calculate(function() {
+                    operator = op;
+                    isEnteringSecond = true;
+                    updateDisplay(currentOperand1 + ' ' + getDisplayOp(operator));
+                });
+                return;
+            }
+            operator = op;
+            isEnteringSecond = true;
+            updateDisplay(currentOperand1 + ' ' + getDisplayOp(operator));
+        }
 
-    function tokenize(expr) {
-        var tokens = [];
-        var i = 0;
-        while (i < expr.length) {
-            var ch = expr.charAt(i);
-            if (/[\d.]/.test(ch)) {
-                var num = '';
-                while (i < expr.length && /[\d.]/.test(expr.charAt(i))) {
-                    num += expr.charAt(i++);
+        function handleBackspace() {
+            if (isEnteringSecond) {
+                if (currentOperand2) {
+                    currentOperand2 = currentOperand2.slice(0, -1);
+                    updateDisplay(currentOperand1 + ' ' + getDisplayOp(operator) + (currentOperand2 ? ' ' + currentOperand2 : ''));
+                } else {
+                    isEnteringSecond = false;
+                    operator = '';
+                    updateDisplay(currentOperand1);
                 }
-                tokens.push({ type: 'NUM', value: parseFloat(num) });
-            } else if (isOperator(ch)) {
-                tokens.push({ type: 'OP', value: ch });
-                i++;
             } else {
-                i++;
+                if (currentOperand1) {
+                    currentOperand1 = currentOperand1.slice(0, -1);
+                    updateDisplay(currentOperand1);
+                }
             }
         }
-        return tokens;
-    }
 
-    var tpos;
-
-    function parsePrimary(tokens) {
-        if (tpos < tokens.length && tokens[tpos].type === 'NUM') {
-            return tokens[tpos++].value;
-        }
-        throw new Error('invalid_expr');
-    }
-
-    function parseUnary(tokens) {
-        if (tpos < tokens.length && tokens[tpos].type === 'OP' && tokens[tpos].value === '-') {
-            tpos++;
-            return -parsePrimary(tokens);
-        }
-        return parsePrimary(tokens);
-    }
-
-    function parseMulDiv(tokens) {
-        var left = parseUnary(tokens);
-        while (tpos < tokens.length && (tokens[tpos].value === '*' || tokens[tpos].value === '/')) {
-            var op = tokens[tpos++].value;
-            var right = parseUnary(tokens);
-            if (op === '/') {
-                if (right === 0) { throw new Error('div_zero'); }
-                left = left / right;
+        function handleDot() {
+            if (isEnteringSecond) {
+                if (currentOperand2.indexOf('.') === -1) {
+                    currentOperand2 += (currentOperand2 ? '' : '0') + '.';
+                    updateDisplay(currentOperand1 + ' ' + getDisplayOp(operator) + ' ' + currentOperand2);
+                }
             } else {
-                left = left * right;
+                if (currentOperand1.indexOf('.') === -1) {
+                    currentOperand1 += (currentOperand1 ? '' : '0') + '.';
+                    updateDisplay(currentOperand1);
+                }
             }
         }
-        return left;
-    }
 
-    function parseAddSub(tokens) {
-        var left = parseMulDiv(tokens);
-        while (tpos < tokens.length && (tokens[tpos].value === '+' || tokens[tpos].value === '-')) {
-            var op = tokens[tpos++].value;
-            var right = parseMulDiv(tokens);
-            left = op === '+' ? left + right : left - right;
-        }
-        return left;
-    }
+        function calculate(callback) {
+            if (!currentOperand1 || !operator || !currentOperand2) return;
 
-    function evaluate(expr) {
-        var tokens = tokenize(expr);
-        if (tokens.length === 0) { throw new Error('empty'); }
-        tpos = 0;
-        var result = parseAddSub(tokens);
-        if (tpos < tokens.length) { throw new Error('invalid_expr'); }
-        return result;
-    }
+            $display.addClass('loading');
 
-    // ── History (max 5, FIFO) ────────────────────────────────────────────────
-
-    function renderHistory() {
-        var $list = $('#calc-history-list');
-        $list.empty();
-        if (history.length === 0) {
-            $list.append('<li class="calc-history-empty">No history yet.</li>');
-            return;
-        }
-        for (var i = 0; i < history.length; i++) {
-            $list.append($('<li/>').text(history[i]));
-        }
-    }
-
-    function addToHistory(entry) {
-        history.unshift(entry);
-        if (history.length > 5) { history.pop(); }
-        renderHistory();
-    }
-
-    // ── Button click handler ─────────────────────────────────────────────────
-
-    $('.calc-grid button').on('click', function () {
-        var val = String($(this).data('value'));
-
-        if (val === 'C') {
-            expression = '';
-            justCalculated = false;
-            updateDisplay('');
-            return;
+            $.ajax({
+                url: AJS.contextPath() + '/rest/calculator/1.0/calculate',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    operand1: currentOperand1,
+                    operator: operator,
+                    operand2: currentOperand2
+                }),
+                success: function(response) {
+                    if (response.error) {
+                        AJS.messages.error({ title: "Error", body: response.error });
+                        clear();
+                    } else {
+                        var expr = currentOperand1 + ' ' + getDisplayOp(operator) + ' ' + currentOperand2 + ' = ' + response.result;
+                        addHistory(expr);
+                        
+                        currentOperand1 = String(response.result);
+                        operator = '';
+                        currentOperand2 = '';
+                        isEnteringSecond = false;
+                        updateDisplay(currentOperand1);
+                        if (callback) callback();
+                    }
+                },
+                error: function(xhr) {
+                    var errorMsg = "Calculation failed";
+                    try {
+                        var res = JSON.parse(xhr.responseText);
+                        if (res.error) errorMsg = res.error;
+                    } catch(e) {}
+                    AJS.messages.error({ title: "Error", body: errorMsg });
+                },
+                complete: function() {
+                    $display.removeClass('loading');
+                }
+            });
         }
 
-        if (val === '=') {
-            if (expression === '') { return; }
-            try {
-                var result = evaluate(expression);
-                var resultStr = formatResult(result);
-                addToHistory(expression + ' = ' + resultStr);
-                expression = resultStr;
-                justCalculated = true;
-                updateDisplay(expression);
-            } catch (e) {
-                updateDisplay(e.message === 'div_zero' ? 'Error: Div/0' : 'Error');
-                expression = '';
-                justCalculated = false;
+        function clear() {
+            currentOperand1 = '';
+            operator = '';
+            currentOperand2 = '';
+            isEnteringSecond = false;
+            updateDisplay('0');
+        }
+
+        function addHistory(expr) {
+            history.unshift(expr);
+            if (history.length > 5) history.pop();
+            renderHistory();
+        }
+
+        function renderHistory() {
+            $historyList.empty();
+            if (history.length === 0) {
+                $historyList.append('<li class="history-empty">No history yet</li>');
+            } else {
+                history.forEach(function(entry) {
+                    $('<li>').text(entry).appendTo($historyList);
+                });
             }
-            return;
         }
 
-        // After a completed calculation, operator continues from result; digit resets
-        if (justCalculated) {
-            justCalculated = false;
-            if (!isOperator(val)) { expression = ''; }
-        }
+        // --- Event Delegation ---
+        $('.calc-grid').on('click', '.calc-btn', function(e) {
+            e.preventDefault();
+            var $btn = $(this);
+            
+            if ($btn.hasClass('btn-num')) {
+                handleDigit($btn.text().trim());
+            } else if ($btn.hasClass('btn-op')) {
+                if ($btn.hasClass('btn-backspace')) {
+                    handleBackspace();
+                } else if ($btn.text().trim() === '.') {
+                    handleDot();
+                } else {
+                    // Get operator from data-op or just the text
+                    var op = $btn.data('op') || $btn.text().trim();
+                    // Map display symbols back to internal operators
+                    if (op === '÷') op = '/';
+                    if (op === '×') op = '*';
+                    if (op === '−') op = '-';
+                    handleOperator(op);
+                }
+            } else if ($btn.hasClass('btn-clear')) {
+                clear();
+            } else if ($btn.hasClass('btn-equals')) {
+                calculate();
+            }
+        });
 
-        // Replace trailing operator with new operator
-        if (isOperator(val) && expression.length > 0 && isOperator(expression.charAt(expression.length - 1))) {
-            expression = expression.slice(0, -1);
-        }
-
-        // Disallow leading operator except unary minus
-        if (isOperator(val) && expression === '' && val !== '-') { return; }
-
-        // Prevent duplicate decimal point in the current number token
-        if (val === '.') {
-            var segments = expression.split(/[+\-*/]/);
-            if (segments[segments.length - 1].indexOf('.') !== -1) { return; }
-        }
-
-        expression += val;
-        updateDisplay(expression);
+        // Keyboard support (Bonus for better UX)
+        $(document).on('keydown', function(e) {
+            if (!$display.is(':visible')) return;
+            
+            var key = e.key;
+            if (/[0-9]/.test(key)) handleDigit(key);
+            else if (['+', '-', '*', '/'].indexOf(key) !== -1) handleOperator(key);
+            else if (key === 'Enter' || key === '=') calculate();
+            else if (key === 'Escape' || key.toLowerCase() === 'c') clear();
+            else if (key === 'Backspace') handleBackspace();
+            else if (key === '.') handleDot();
+        });
     });
-});
+})(AJS.$);
