@@ -1,16 +1,19 @@
+$webResourceManager.requireResource("com.example.jira-calculator-plugin:calculator-resources")
 <html>
 <head>
-    <title>$i18n.getText("page.title")</title>
+    <title>$i18n.getText("calculator.page.title")</title>
     <meta name="decorator" content="atl.admin"/>
     <meta name="admin.active.section" content="admin_plugins_menu/calculator-section"/>
-    $webResourceManager.requireResource("${atlassian.plugin.key}:calculator-resources")
 </head>
 <body>
+
 <section id="content" role="main">
+
     <header class="aui-page-header">
         <div class="aui-page-header-inner">
             <div class="aui-page-header-main">
-                <h1>$i18n.getText("page.title")</h1>
+                <h2>$i18n.getText("calculator.page.title")</h2>
+                <p>$i18n.getText("calculator.page.description")</p>
             </div>
         </div>
     </header>
@@ -19,52 +22,63 @@
         <div class="aui-page-panel-inner">
             <div class="aui-page-panel-content">
 
-                <div id="calculator-wrapper">
-                    <form class="aui" id="calculator-form" onsubmit="return false;">
-                        <input class="text"
-                               type="text"
-                               id="calc-display"
-                               readonly="readonly"
-                               value=""
-                               placeholder="0"/>
-                    </form>
+                <div id="calculator-container">
 
-                    <div class="calc-grid">
-                        <button class="aui-button calc-btn btn-clear">C</button>
-                        <button class="aui-button calc-btn btn-op" data-op="/">÷</button>
-                        <button class="aui-button calc-btn btn-op" data-op="*">×</button>
-                        <button class="aui-button calc-btn btn-op btn-backspace">⌫</button>
-
-                        <button class="aui-button calc-btn btn-num">7</button>
-                        <button class="aui-button calc-btn btn-num">8</button>
-                        <button class="aui-button calc-btn btn-num">9</button>
-                        <button class="aui-button calc-btn btn-op" data-op="-">−</button>
-
-                        <button class="aui-button calc-btn btn-num">4</button>
-                        <button class="aui-button calc-btn btn-num">5</button>
-                        <button class="aui-button calc-btn btn-num">6</button>
-                        <button class="aui-button calc-btn btn-op" data-op="+">+</button>
-
-                        <button class="aui-button calc-btn btn-num">1</button>
-                        <button class="aui-button calc-btn btn-num">2</button>
-                        <button class="aui-button calc-btn btn-num">3</button>
-                        <button class="aui-button aui-button-primary calc-btn btn-equals btn-equals-tall">=</button>
-
-                        <button class="aui-button calc-btn btn-num btn-zero">0</button>
-                        <button class="aui-button calc-btn btn-op">.</button>
+                    <!-- Display -->
+                    <div id="calc-display-wrapper">
+                        <div id="calc-expression">&nbsp;</div>
+                        <div id="calc-display">0</div>
                     </div>
-                </div>
 
-                <div id="history-panel">
-                    <h3>$i18n.getText("calculator.history.title")</h3>
-                    <ul id="history-list">
-                        <li class="history-empty">$i18n.getText("calculator.history.empty")</li>
-                    </ul>
+                    <!--
+                        PITFALL-05: aui-button 클래스 사용 금지 — 커스텀 클래스만 사용.
+                        Skill 11: onclick 인라인 핸들러 금지 — data-* 속성 + JS 이벤트 위임 사용.
+                    -->
+                    <div class="calc-grid">
+                        <!-- Row 1: utility + operators -->
+                        <button class="calc-btn calc-btn-clear"    data-action="clear">C</button>
+                        <button class="calc-btn calc-btn-sign"     data-action="sign">&#177;</button>
+                        <button class="calc-btn calc-btn-operator" data-action="operator" data-value="/">&#247;</button>
+                        <button class="calc-btn calc-btn-operator" data-action="operator" data-value="*">&#215;</button>
+
+                        <!-- Row 2 -->
+                        <button class="calc-btn calc-btn-number"   data-action="number" data-value="7">7</button>
+                        <button class="calc-btn calc-btn-number"   data-action="number" data-value="8">8</button>
+                        <button class="calc-btn calc-btn-number"   data-action="number" data-value="9">9</button>
+                        <button class="calc-btn calc-btn-operator" data-action="operator" data-value="-">&#8722;</button>
+
+                        <!-- Row 3 -->
+                        <button class="calc-btn calc-btn-number"   data-action="number" data-value="4">4</button>
+                        <button class="calc-btn calc-btn-number"   data-action="number" data-value="5">5</button>
+                        <button class="calc-btn calc-btn-number"   data-action="number" data-value="6">6</button>
+                        <button class="calc-btn calc-btn-operator" data-action="operator" data-value="+">+</button>
+
+                        <!-- Row 4: 1,2,3 + equals (spans rows 4-5 in col 4) -->
+                        <button class="calc-btn calc-btn-number"   data-action="number" data-value="1">1</button>
+                        <button class="calc-btn calc-btn-number"   data-action="number" data-value="2">2</button>
+                        <button class="calc-btn calc-btn-number"   data-action="number" data-value="3">3</button>
+                        <button class="calc-btn calc-btn-equals"   data-action="equals">=</button>
+
+                        <!-- Row 5: 0 (span 2 cols), decimal -->
+                        <button class="calc-btn calc-btn-number calc-btn-zero" data-action="number" data-value="0">0</button>
+                        <button class="calc-btn calc-btn-decimal"  data-action="decimal">.</button>
+                    </div>
+
+                    <!-- History Panel: max 5 entries, JS-managed -->
+                    <div id="calc-history-panel">
+                        <h3>$i18n.getText("calculator.history.title")</h3>
+                        <ul id="calc-history-list">
+                            <li class="calc-history-empty">No calculations yet.</li>
+                        </ul>
+                    </div>
+
                 </div>
 
             </div>
         </div>
     </div>
+
 </section>
+
 </body>
 </html>

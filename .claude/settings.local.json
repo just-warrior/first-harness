@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(atlas-mvn clean *)"
+      "Bash(atlas-mvn clean *)",
+      "Bash(jar tf *)",
+      "Bash(python *)"
     ]
   }
 }

@@ -13,7 +13,7 @@ public class CalculatorAction extends JiraWebActionSupport {
     }
 
     @Override
-    protected String doExecute() throws Exception {
-        return SUCCESS;
+    public String execute() throws Exception {
+        return INPUT;
     }
 }

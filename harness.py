@@ -5,14 +5,21 @@ import re
 import datetime
 import hashlib
 import shutil
+import time
 
 
 class SmartOrchestrator:
     """
-    Plan Once, Execute Consistently (POEC) 하네스 v3.
-    - 첫 실행: LLM이 REQUIREMENTS.md를 분석 → 구조화된 계획 생성 → PLAN_LOCK.json에 잠금
-    - 이후 실행: Lock된 계획을 그대로 재사용 (LLM 재호출 없음 → 일관성 보장)
-    - REQUIREMENTS.md 변경 시: Lock 삭제 → 새 계획 생성
+    Plan Once, Execute Consistently (POEC) 하네스 v4.
+    v4 개선:
+    - P0: NEW 인텐트 시 플랜 생성 성공 후 아카이브 (데이터 손실 방지)
+    - P0: 재시도 시 실패 원인 프롬프트 주입
+    - P1: 파일 커버리지 검증 full-path suffix 매칭
+    - P1: REQUIREMENTS.md + SKILLS.md 복합 해시 추적
+    - P2: 챕터 관련 파일만 전체 내용 주입 (선택적 매니페스트)
+    - P2: FIX_HISTORY.md 플랜 생성 프롬프트 주입
+    - P3: 챕터 실행 시간 추적
+    - P3: analyze_intent() 결과 캐싱
     """
 
     MAX_RETRIES = 2
@@ -29,6 +36,7 @@ class SmartOrchestrator:
         self.info_file = os.path.join(self.status_dir, "project_info.json")
         self.plan_lock_file = os.path.join(self.status_dir, "PLAN_LOCK.json")
         self.skill_file = os.path.join(self.base_dir, ".claude/SKILLS.md")
+        self.fix_history_file = os.path.join(self.base_dir, "FIX_HISTORY.md")
 
         for d in [self.workspace_dir, self.status_dir, self.archive_root]:
             if not os.path.exists(d):
@@ -37,11 +45,14 @@ class SmartOrchestrator:
     # ------------------------------------------------------------------
     # 유틸리티
     # ------------------------------------------------------------------
-    def get_file_hash(self, path):
-        if not os.path.exists(path):
-            return None
-        with open(path, "rb") as f:
-            return hashlib.md5(f.read()).hexdigest()
+    def get_file_hash(self):
+        """P1: REQUIREMENTS.md + SKILLS.md 복합 해시 (가이드라인 변경도 감지)"""
+        content = b""
+        for path in [self.spec_file, self.skill_file]:
+            if os.path.exists(path):
+                with open(path, "rb") as f:
+                    content += f.read()
+        return hashlib.md5(content).hexdigest()
 
     def archive_current(self):
         """현재 워크스페이스와 상태를 아카이브로 이동하고 초기화"""
@@ -66,11 +77,22 @@ class SmartOrchestrator:
     # ------------------------------------------------------------------
     # Workspace 상태 주입 — 이전 챕터 결과를 다음 챕터에 전달
     # ------------------------------------------------------------------
-    def get_workspace_manifest(self):
-        """workspace 내 모든 소스 파일의 경로와 첫 30줄을 수집"""
+    def get_workspace_manifest(self, chapter_info=None):
+        """
+        P2: chapter_info가 있으면 관련 파일만 전체 내용(30줄), 나머지는 경로 목록만 표시.
+        대형 프로젝트에서 토큰 폭증 방지.
+        """
         manifest = "# CURRENT WORKSPACE STATE (이전 챕터에서 생성된 파일들)\n"
         manifest += "> 아래 파일들은 이미 존재합니다. 이 파일들과 일관성을 유지하세요.\n\n"
-        file_count = 0
+
+        related_basenames = set()
+        if chapter_info:
+            for f in chapter_info.get("expected_files", []):
+                related_basenames.add(os.path.basename(f))
+
+        detailed_entries = []
+        listed_paths = []
+
         for root, dirs, files in os.walk(self.workspace_dir):
             dirs[:] = [d for d in dirs if d not in ("target", ".osgi-plugins", ".idea")]
             for fname in sorted(files):
@@ -78,22 +100,34 @@ class SmartOrchestrator:
                     continue
                 filepath = os.path.join(root, fname)
                 rel = os.path.relpath(filepath, self.workspace_dir)
-                try:
-                    with open(filepath, "r", encoding="utf-8", errors="ignore") as fh:
-                        lines = fh.readlines()[:30]
-                    manifest += f"## {rel}\n```\n{''.join(lines)}```\n\n"
-                    file_count += 1
-                except Exception:
-                    pass
-        if file_count == 0:
+                if not chapter_info or fname in related_basenames:
+                    detailed_entries.append((rel, filepath))
+                else:
+                    listed_paths.append(rel)
+
+        for rel, filepath in detailed_entries:
+            try:
+                with open(filepath, "r", encoding="utf-8", errors="ignore") as fh:
+                    lines = fh.readlines()[:30]
+                manifest += f"## {rel}\n```\n{''.join(lines)}```\n\n"
+            except Exception:
+                pass
+
+        if listed_paths:
+            manifest += "## 기타 파일 목록 (참조용 — 일관성 유지)\n"
+            for p in listed_paths:
+                manifest += f"- {p}\n"
+            manifest += "\n"
+
+        if not detailed_entries and not listed_paths:
             manifest += "_아직 생성된 파일이 없습니다._\n"
+
         return manifest
 
     # ------------------------------------------------------------------
-    # PLAN LOCK: LLM이 한 번 생성한 계획을 잠그고 재사용
+    # PLAN LOCK
     # ------------------------------------------------------------------
     def load_locked_plan(self):
-        """PLAN_LOCK.json이 존재하면 잠긴 계획을 반환, 없으면 None"""
         if os.path.exists(self.plan_lock_file):
             with open(self.plan_lock_file, "r", encoding="utf-8") as f:
                 plan = json.load(f)
@@ -102,7 +136,6 @@ class SmartOrchestrator:
         return None
 
     def save_locked_plan(self, chapters, req_hash):
-        """생성된 계획을 PLAN_LOCK.json에 저장하여 잠금"""
         plan = {
             "created_at": datetime.datetime.now().isoformat(),
             "req_hash": req_hash,
@@ -113,20 +146,23 @@ class SmartOrchestrator:
         print(f"🔒 [Plan Lock] 계획 잠금 완료 ({len(chapters)}개 챕터) → {self.plan_lock_file}")
 
     def generate_plan_from_requirements(self):
-        """
-        LLM이 REQUIREMENTS.md를 분석하여 구조화된 작업 계획을 생성.
-        어떤 프로젝트든 유연하게 대응하되, 출력 스키마를 강제하여 일관성을 확보.
-        """
         print("🧠 [Plan] AI가 설계서를 분석하여 작업 계획을 생성 중...")
 
         with open(self.spec_file, "r", encoding="utf-8") as f:
             spec = f.read()
 
-        # 스킬 파일 내용도 함께 전달
         skills = ""
         if os.path.exists(self.skill_file):
             with open(self.skill_file, "r", encoding="utf-8") as f:
                 skills = f.read()
+
+        # P2: FIX_HISTORY.md가 있으면 플랜 프롬프트에 주입 (반복 실수 방지)
+        fix_history_section = ""
+        if os.path.exists(self.fix_history_file):
+            with open(self.fix_history_file, "r", encoding="utf-8") as f:
+                fix_history = f.read().strip()
+            if fix_history:
+                fix_history_section = f"\n\n[알려진 실패 패턴 — 반드시 회피]\n{fix_history}"
 
         prompt = f"""당신은 시니어 아틀라시안 플러그인 개발자입니다.
 아래 설계서를 분석하여 개발 작업을 챕터 단위로 분해하세요.
@@ -135,7 +171,7 @@ class SmartOrchestrator:
 {spec}
 
 [기술 가이드]
-{skills}
+{skills}{fix_history_section}
 
 [출력 규칙 - 반드시 준수]
 1. 결과는 반드시 아래 JSON 스키마의 배열로만 답변하세요. JSON 외 텍스트는 절대 포함하지 마세요.
@@ -143,6 +179,9 @@ class SmartOrchestrator:
 3. 마지막 챕터는 반드시 "빌드 검증" 챕터여야 합니다.
 4. expected_files에는 workspace 기준 상대 경로를 정확히 기재하세요.
 5. 설계서에 '파일 매니페스트' 섹션이 있다면, 그 경로를 그대로 사용하세요.
+6. 파일 매니페스트의 모든 파일을 빠짐없이 expected_files에 배분하세요. 누락된 파일이 하나라도 있으면 안 됩니다.
+7. 프론트엔드 파일(.css, .js, Velocity 템플릿 .vm)은 반드시 독립된 별도 챕터(예: "프론트엔드 UI 구현")로 분리하세요. 다른 챕터(백엔드, 프로젝트 골격 등)에 합치지 마세요.
+8. 각 챕터의 description에는 REQUIREMENTS.md의 해당 섹션(예: 3.2)을 명시적으로 인용하여 구체적인 구현 지시를 포함하세요.
 
 [JSON 스키마]
 ```json
@@ -163,7 +202,6 @@ JSON 배열만 출력하세요:"""
             capture_output=True, text=True, cwd=self.base_dir,
         )
 
-        # JSON 추출
         match = re.search(r'\[\s*\{.*\}\s*\]', result.stdout, re.DOTALL)
         if not match:
             print("❌ AI 계획 생성 실패: JSON 파싱 불가")
@@ -176,7 +214,6 @@ JSON 배열만 출력하세요:"""
             print(f"❌ JSON 디코딩 실패: {e}")
             return None
 
-        # 기본 검증
         for ch in chapters:
             if not all(k in ch for k in ("chapter", "task", "description")):
                 print(f"❌ 필수 키 누락: {ch}")
@@ -185,13 +222,23 @@ JSON 배열만 출력하세요:"""
                 ch["expected_files"] = []
 
         print(f"✅ AI 계획 생성 완료: {len(chapters)}개 챕터")
+        chapters = self._validate_and_fix_plan_coverage(chapters)
+        print(f"✅ 커버리지 보정 완료: {len(chapters)}개 챕터")
         for i, ch in enumerate(chapters):
             print(f"   Chapter {i+1}: {ch['chapter']} ({len(ch['expected_files'])}개 파일)")
 
         return chapters
 
-    def analyze_intent(self):
-        """설계 변경의 의도를 분석 (NEW vs INCREMENTAL)"""
+    def analyze_intent(self, curr_hash):
+        """P3: 동일 해시면 캐시된 의도 재사용, 새 해시면 LLM 호출 후 캐시 저장"""
+        if os.path.exists(self.info_file):
+            with open(self.info_file, "r") as f:
+                info = json.load(f)
+            cached = info.get("intent_cache", {})
+            if cached.get("hash") == curr_hash:
+                print(f"🔒 [Intent Cache] 캐시된 의도 재사용: {cached['intent']}")
+                return cached["intent"]
+
         print("🔍 설계 변경 감지! AI가 의도를 분석 중입니다...")
         with open(self.spec_file, "r", encoding="utf-8") as f:
             spec = f.read()
@@ -211,13 +258,21 @@ JSON 배열만 출력하세요:"""
         if result.stdout and "INTENT: NEW" in result.stdout.upper():
             intent = "NEW"
         print(f"🤖 AI 판단 결과: {intent}")
+
+        info = {}
+        if os.path.exists(self.info_file):
+            with open(self.info_file, "r") as f:
+                info = json.load(f)
+        info["intent_cache"] = {"hash": curr_hash, "intent": intent}
+        with open(self.info_file, "w") as f:
+            json.dump(info, f)
+
         return intent
 
     # ------------------------------------------------------------------
-    # 태스크 파일 생성 (PLAN_LOCK 기반)
+    # 태스크 파일 생성
     # ------------------------------------------------------------------
     def write_tasks_from_plan(self, chapters, completed_chapters=None):
-        """잠긴 계획(chapters)을 기반으로 TASKS.md 생성"""
         if completed_chapters is None:
             completed_chapters = set()
 
@@ -234,9 +289,9 @@ JSON 배열만 출력하세요:"""
         print(f"📋 TASKS.md 생성 완료 ({len(chapters)}개 챕터)")
 
     # ------------------------------------------------------------------
-    # 챕터 실행 — Workspace 상태 주입 + 검증 강화
+    # 챕터 실행
     # ------------------------------------------------------------------
-    def execute_chapter(self, chapter_num, chapter_info, retry_count=0):
+    def execute_chapter(self, chapter_num, chapter_info, retry_count=0, failure_context=None):
         chapter_name = chapter_info["chapter"]
         tasks = chapter_info["task"]
         description = chapter_info["description"]
@@ -249,14 +304,21 @@ JSON 배열만 출력하세요:"""
                 with open(path, "r", encoding="utf-8") as f:
                     static_context += f"\n## {os.path.basename(path)}\n{f.read()}\n"
 
-        # 2. 이전 챕터 결과물 주입
-        workspace_state = self.get_workspace_manifest()
+        # 2. P2: 현재 챕터 관련 파일만 전체 내용, 나머지는 경로 목록
+        workspace_state = self.get_workspace_manifest(chapter_info)
 
-        # 3. 프롬프트
+        # 3. P0: 재시도 시 실패 원인 주입
+        failure_section = ""
+        if failure_context:
+            failure_section = f"""
+[이전 시도 실패 원인 — 반드시 해결 후 재시도]
+{failure_context}
+"""
+
         lean_prompt = f"""{static_context}
 
 {workspace_state}
-
+{failure_section}
 # CURRENT GOAL: Chapter {chapter_num} - {chapter_name}
 당신은 위 가이드라인을 완벽히 숙지한 시니어 개발자입니다.
 현재 `workspace`에서 다음 작업을 수행하세요.
@@ -285,57 +347,141 @@ JSON 배열만 출력하세요:"""
             cwd=self.base_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         )
         full_output = []
-        for line in process.stdout:
-            print(line, end="")
-            full_output.append(line)
-        process.wait()
+        try:
+            for line in process.stdout:
+                print(line, end="")
+                full_output.append(line)
+            process.wait(timeout=self.SUBPROCESS_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            print(f"\n❌ [Chapter {chapter_num}] 타임아웃 발생 (작업 중단)")
+            return None
+        
         output_text = "".join(full_output)
 
-        # 검증 1: CHAPTER COMPLETE 확인
-        if "CHAPTER COMPLETE" not in output_text.upper():
-            print(f"⚠️ [Chapter {chapter_num}] 'CHAPTER COMPLETE' 미감지")
-            if retry_count < self.MAX_RETRIES:
-                print(f"🔄 재시도합니다... ({retry_count + 1}/{self.MAX_RETRIES})")
-                return self.execute_chapter(chapter_num, chapter_info, retry_count + 1)
-            else:
-                print(f"❌ [Chapter {chapter_num}] 최대 재시도 초과. 건너뜁니다.")
-                return None
+        # P0: 실패 원인 수집 후 재시도 프롬프트에 주입
+        failure_reasons = []
 
-        # 검증 2: 필수 파일 존재 확인
+        if "CHAPTER COMPLETE" not in output_text.upper():
+            failure_reasons.append(
+                "'CHAPTER COMPLETE' 문자열이 출력에 없음 — 작업 완료 후 반드시 'CHAPTER COMPLETE'를 출력하세요."
+            )
+
         missing = self._check_expected_files(expected_files)
         if missing:
-            print(f"⚠️ [Chapter {chapter_num}] 필수 파일 누락: {missing}")
+            failure_reasons.append(
+                f"다음 파일이 workspace에 존재하지 않음 — 반드시 생성하세요: {missing}"
+            )
+
+        if failure_reasons:
             if retry_count < self.MAX_RETRIES:
-                print(f"🔄 누락 파일 생성을 위해 재시도합니다... ({retry_count + 1}/{self.MAX_RETRIES})")
-                return self.execute_chapter(chapter_num, chapter_info, retry_count + 1)
+                print(f"⚠️ [Chapter {chapter_num}] 실패 원인: {'; '.join(failure_reasons)}")
+                print(f"🔄 재시도합니다... ({retry_count + 1}/{self.MAX_RETRIES})")
+                return self.execute_chapter(
+                    chapter_num, chapter_info,
+                    retry_count + 1,
+                    failure_context="\n".join(f"- {r}" for r in failure_reasons),
+                )
             else:
-                print(f"❌ [Chapter {chapter_num}] 최대 재시도 초과. 현재 상태로 계속합니다.")
+                if "CHAPTER COMPLETE" not in output_text.upper():
+                    print(f"❌ [Chapter {chapter_num}] 최대 재시도 초과. 건너뜁니다.")
+                    return None
+                print(f"❌ [Chapter {chapter_num}] 최대 재시도 초과. 파일 누락 상태로 계속합니다.")
 
         return output_text
 
     def _check_expected_files(self, expected_files):
-        """expected_files 중 workspace 내에 존재하지 않는 파일 목록 반환"""
+        """P1: basename이 아닌 full-path suffix 매칭으로 누락 파일 탐지"""
         missing = []
         for rel_path in expected_files:
+            norm_rel = rel_path.replace(os.sep, "/")
             found = False
-            # 직접 경로
             if os.path.exists(os.path.join(self.workspace_dir, rel_path)):
                 found = True
-            # basename으로 검색 (프로젝트 하위 디렉토리 대응)
             if not found:
                 for root, dirs, files in os.walk(self.workspace_dir):
-                    dirs[:] = [d for d in dirs if d not in ("target", ".osgi-plugins")]
-                    if os.path.basename(rel_path) in files:
-                        found = True
+                    dirs[:] = [d for d in dirs if d not in self.EXCLUDE_DIRS]
+                    for fname in files:
+                        full = os.path.join(root, fname)
+                        rel_full = os.path.relpath(full, self.workspace_dir).replace(os.sep, "/")
+                        if rel_full.endswith(norm_rel):
+                            found = True
+                            break
+                    if found:
                         break
             if not found:
                 missing.append(rel_path)
         return missing
 
     # ------------------------------------------------------------------
+    # Plan Coverage
+    # ------------------------------------------------------------------
+    def _parse_manifest_files(self):
+        if not os.path.exists(self.spec_file):
+            return []
+        with open(self.spec_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        return re.findall(r"`(jira-calculator-plugin/[^`]+)`", content)
+
+    def _validate_and_fix_plan_coverage(self, chapters):
+        """P1: basename이 아닌 suffix 매칭으로 커버리지 검증 (오탐 방지)"""
+        manifest_files = self._parse_manifest_files()
+        if not manifest_files:
+            return chapters
+
+        def is_covered(manifest_path, chapter_files):
+            norm_mf = manifest_path.replace(os.sep, "/")
+            for cf in chapter_files:
+                norm_cf = cf.replace(os.sep, "/")
+                if norm_mf.endswith(norm_cf) or norm_cf.endswith(norm_mf):
+                    return True
+            return False
+
+        missing = [
+            mf for mf in manifest_files
+            if not any(is_covered(mf, ch.get("expected_files", [])) for ch in chapters)
+        ]
+        if not missing:
+            return chapters
+
+        print(f"⚠️ [Plan Coverage] 미배분 파일 감지: {missing}")
+
+        frontend_exts = {".css", ".js", ".vm"}
+        frontend_missing = [f for f in missing if os.path.splitext(f)[1] in frontend_exts]
+
+        if frontend_missing:
+            fe_chapter = next(
+                (ch for ch in chapters
+                 if any(kw in ch["chapter"].lower() for kw in ("프론트", "frontend", "ui"))),
+                None,
+            )
+            if fe_chapter:
+                fe_chapter["expected_files"] = list(
+                    set(fe_chapter.get("expected_files", []) + frontend_missing)
+                )
+                print(f"✅ [Plan Coverage] '{fe_chapter['chapter']}' 챕터에 {frontend_missing} 추가")
+            else:
+                new_chapter = {
+                    "chapter": "프론트엔드 UI 구현",
+                    "task": "CSS Grid 레이아웃 및 JS AJAX 연동 구현",
+                    "description": (
+                        "REQUIREMENTS.md 3.2절 기준: CSS Grid로 계산기 버튼 격자 배치, "
+                        "AUI 버튼 스타일 적용(aui-button), JS 배열로 최대 5개 이력 관리. "
+                        "인라인 핸들러 금지 — data-* 속성 + AJS.$ 이벤트 위임 방식 사용(SKILLS.md Skill 11)."
+                    ),
+                    "expected_files": frontend_missing,
+                }
+                insert_idx = max(0, len(chapters) - 1)
+                chapters.insert(insert_idx, new_chapter)
+                print(f"✅ [Plan Coverage] 프론트엔드 챕터 자동 생성: {frontend_missing}")
+
+        return chapters
+
+    # ------------------------------------------------------------------
     # 로그
     # ------------------------------------------------------------------
-    def log_progress(self, chapter_num, chapter_name, output):
+    def log_progress(self, chapter_num, chapter_name, output, elapsed_seconds=None):
+        """P3: 실행 시간 포함 로깅"""
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         files_match = re.findall(
             r"(?:Created|Updated|Modified|Edited|Saved|Wrote to|Created file|Overwriting)"
@@ -349,14 +495,17 @@ JSON 배열만 출력하세요:"""
             recent = self._get_recently_modified_files(minutes=5)
             summary = f"변경 파일 (타임스탬프): {', '.join(recent[:8])}" if recent else "작업 완료"
 
+        time_str = f" ({elapsed_seconds:.1f}s)" if elapsed_seconds is not None else ""
         with open(self.log_file, "a", encoding="utf-8") as log:
-            log.write(f"\n### ✅ [Chapter {chapter_num}] {chapter_name} ({now})\n- {summary}\n")
+            log.write(
+                f"\n### ✅ [Chapter {chapter_num}] {chapter_name} ({now}){time_str}\n- {summary}\n"
+            )
 
     def _get_recently_modified_files(self, minutes=5):
         cutoff = datetime.datetime.now().timestamp() - (minutes * 60)
         recent = []
         for root, dirs, files in os.walk(self.workspace_dir):
-            dirs[:] = [d for d in dirs if d not in ("target", ".osgi-plugins")]
+            dirs[:] = [d for d in dirs if d not in self.EXCLUDE_DIRS]
             for fname in files:
                 filepath = os.path.join(root, fname)
                 try:
@@ -380,7 +529,7 @@ JSON 배열만 출력하세요:"""
     # 메인 실행 루프
     # ------------------------------------------------------------------
     def run(self):
-        curr_hash = self.get_file_hash(self.spec_file)
+        curr_hash = self.get_file_hash()
         info = {}
         if os.path.exists(self.info_file):
             with open(self.info_file, "r") as f:
@@ -389,7 +538,7 @@ JSON 배열만 출력하세요:"""
         old_hash = info.get("req_hash")
         locked_plan = self.load_locked_plan()
 
-        # ── Case 1: 신규 프로젝트 (해시 없음) ──
+        # ── Case 1: 신규 프로젝트 ──
         if not old_hash:
             print("🆕 신규 프로젝트 설계를 시작합니다...")
             if locked_plan and locked_plan.get("req_hash") == curr_hash:
@@ -407,23 +556,22 @@ JSON 배열만 출력하세요:"""
             with open(self.info_file, "w") as f:
                 json.dump(info, f)
 
-        # ── Case 2: REQUIREMENTS.md 변경됨 ──
+        # ── Case 2: REQUIREMENTS.md 또는 SKILLS.md 변경됨 ──
         elif old_hash != curr_hash:
-            intent = self.analyze_intent()
+            intent = self.analyze_intent(curr_hash)
             if intent == "NEW":
-                self.archive_current()
-                # Lock 파일도 삭제
-                if os.path.exists(self.plan_lock_file):
-                    os.remove(self.plan_lock_file)
-
+                # P0: 플랜 생성 성공 후 아카이브 (실패 시 기존 워크스페이스 보존)
                 chapters = self.generate_plan_from_requirements()
                 if not chapters:
-                    print("❌ 계획 생성 실패. 종료합니다.")
+                    print("❌ 계획 생성 실패. 기존 워크스페이스는 보존됩니다.")
                     return
+                self.archive_current()
+                if os.path.exists(self.plan_lock_file):
+                    os.remove(self.plan_lock_file)
                 self.save_locked_plan(chapters, curr_hash)
                 self.write_tasks_from_plan(chapters)
             else:
-                # INCREMENTAL: 기존 완료 상태 보존, Lock 갱신
+                # INCREMENTAL: 기존 완료 상태 보존
                 completed_chapters = set()
                 if os.path.exists(self.task_file):
                     with open(self.task_file, "r", encoding="utf-8") as f:
@@ -433,7 +581,6 @@ JSON 배열만 출력하세요:"""
                                 if m:
                                     completed_chapters.add(int(m.group(1)))
 
-                # Lock 삭제 후 새 계획 생성
                 if os.path.exists(self.plan_lock_file):
                     os.remove(self.plan_lock_file)
 
@@ -448,7 +595,7 @@ JSON 배열만 출력하세요:"""
             with open(self.info_file, "w") as f:
                 json.dump(info, f)
 
-        # ── Case 3: 변경 없음 — Lock된 계획으로 미완료 챕터 실행 ──
+        # ── Case 3: 변경 없음 ──
         else:
             if locked_plan:
                 chapters = locked_plan["chapters"]
@@ -488,11 +635,39 @@ JSON 배열만 출력하세요:"""
         print(f"📌 미완료 챕터 {len(pending)}개 실행 시작")
 
         for c_num, chapter_info in sorted(pending, key=lambda x: x[0]):
+            start = time.time()
             output = self.execute_chapter(c_num, chapter_info)
+            elapsed = time.time() - start
             if output:
                 self.update_status(c_num)
-                self.log_progress(c_num, chapter_info["chapter"], output)
-                print(f"✅ [Chapter {c_num}] 완료: {chapter_info['chapter']}")
+                self.log_progress(c_num, chapter_info["chapter"], output, elapsed_seconds=elapsed)
+                print(f"✅ [Chapter {c_num}] 완료: {chapter_info['chapter']} ({elapsed:.1f}s)")
+            else:
+                print(f"⚠️ [Chapter {c_num}] 실행 중 오류 발생. 중단합니다.")
+                break
+
+        print("\n🏁 하네스 실행 완료")
+
+
+if __name__ == "__main__":
+    harness = SmartOrchestrator()
+    harness.run()
+료")
+
+
+if __name__ == "__main__":
+    harness = SmartOrchestrator()
+    harness.run()
+�� 실행 시작")
+
+        for c_num, chapter_info in sorted(pending, key=lambda x: x[0]):
+            start = time.time()
+            output = self.execute_chapter(c_num, chapter_info)
+            elapsed = time.time() - start
+            if output:
+                self.update_status(c_num)
+                self.log_progress(c_num, chapter_info["chapter"], output, elapsed_seconds=elapsed)
+                print(f"✅ [Chapter {c_num}] 완료: {chapter_info['chapter']} ({elapsed:.1f}s)")
             else:
                 print(f"⚠️ [Chapter {c_num}] 실행 중 오류 발생. 중단합니다.")
                 break

@@ -1,191 +1,194 @@
-(function($) {
-    "use strict";
+(function () {
+    'use strict';
 
-    $(function() {
-        var currentOperand1 = '';
-        var operator = '';
-        var currentOperand2 = '';
-        var isEnteringSecond = false;
-        var history = [];
+    /* ── State ── */
+    var currentInput = '';
+    var pendingNum = null;
+    var pendingOp = null;
+    var justCalculated = false;
+    var history = [];
 
-        var $display = $('#calc-display');
-        var $historyList = $('#history-list');
+    /* ── DOM helpers ── */
+    function setDisplay(val) {
+        AJS.$('#calc-display').text(String(val));
+    }
 
-        function updateDisplay(value) {
-            $display.val(value || '0');
+    function setExpression(val) {
+        AJS.$('#calc-expression').text(val || ' ');
+    }
+
+    function updateHistoryPanel() {
+        var $list = AJS.$('#calc-history-list');
+        $list.empty();
+        if (history.length === 0) {
+            $list.append('<li class="calc-history-empty">No calculations yet.</li>');
+            return;
         }
-
-        function getDisplayOp(op) {
-            const opMap = { '*': '×', '/': '÷', '-': '−', '+': '+' };
-            return opMap[op] || op;
+        for (var i = history.length - 1; i >= 0; i--) {
+            $list.append('<li>' + AJS.escapeHtml(history[i]) + '</li>');
         }
+    }
 
-        function handleDigit(n) {
-            if (isEnteringSecond) {
-                currentOperand2 += n;
-                updateDisplay(currentOperand1 + ' ' + getDisplayOp(operator) + ' ' + currentOperand2);
+    /* ── Input helpers ── */
+    function appendDigit(digit) {
+        if (justCalculated) {
+            currentInput = digit;
+            justCalculated = false;
+        } else {
+            if (currentInput === '0' && digit !== '.') {
+                currentInput = digit;
             } else {
-                currentOperand1 += n;
-                updateDisplay(currentOperand1);
+                currentInput += digit;
             }
         }
+        setDisplay(currentInput || '0');
+    }
 
-        function handleOperator(op) {
-            if (!currentOperand1) return;
-            if (isEnteringSecond && currentOperand2) {
-                // If user clicks another operator after entering full expression, calculate first
-                calculate(function() {
-                    operator = op;
-                    isEnteringSecond = true;
-                    updateDisplay(currentOperand1 + ' ' + getDisplayOp(operator));
+    function appendDecimal() {
+        if (justCalculated) {
+            currentInput = '0.';
+            justCalculated = false;
+        } else if (currentInput.indexOf('.') === -1) {
+            currentInput = (currentInput || '0') + '.';
+        }
+        setDisplay(currentInput);
+    }
+
+    function toggleSign() {
+        if (!currentInput || currentInput === '0') return;
+        if (currentInput.charAt(0) === '-') {
+            currentInput = currentInput.slice(1);
+        } else {
+            currentInput = '-' + currentInput;
+        }
+        setDisplay(currentInput);
+    }
+
+    function clearAll() {
+        currentInput = '';
+        pendingNum = null;
+        pendingOp = null;
+        justCalculated = false;
+        setDisplay('0');
+        setExpression('');
+    }
+
+    function selectOperator(op) {
+        if (currentInput === '' && pendingNum !== null) {
+            pendingOp = op;
+            setExpression(String(pendingNum) + ' ' + op);
+            return;
+        }
+        if (currentInput !== '') {
+            if (pendingNum !== null && pendingOp !== null) {
+                calculate(function (result) {
+                    pendingNum = result;
+                    pendingOp = op;
+                    currentInput = '';
+                    justCalculated = false;
+                    setDisplay(String(result));
+                    setExpression(String(result) + ' ' + op);
                 });
                 return;
             }
-            operator = op;
-            isEnteringSecond = true;
-            updateDisplay(currentOperand1 + ' ' + getDisplayOp(operator));
+            pendingNum = parseFloat(currentInput);
+            pendingOp = op;
+            setExpression(currentInput + ' ' + op);
+            currentInput = '';
         }
+    }
 
-        function handleBackspace() {
-            if (isEnteringSecond) {
-                if (currentOperand2) {
-                    currentOperand2 = currentOperand2.slice(0, -1);
-                    updateDisplay(currentOperand1 + ' ' + getDisplayOp(operator) + (currentOperand2 ? ' ' + currentOperand2 : ''));
-                } else {
-                    isEnteringSecond = false;
-                    operator = '';
-                    updateDisplay(currentOperand1);
+    /* ── REST call ── */
+    function calculate(callback) {
+        if (pendingNum === null || pendingOp === null || currentInput === '') return;
+
+        var payload = {
+            num1: String(pendingNum),
+            num2: currentInput,
+            operator: pendingOp
+        };
+
+        var expression = String(pendingNum) + ' ' + pendingOp + ' ' + currentInput;
+
+        AJS.$.ajax({
+            url: AJS.contextPath() + '/rest/calculator/1.0/calculate',
+            type: 'POST',
+            contentType: 'application/json',
+            dataType: 'json',
+            data: JSON.stringify(payload),
+            success: function (data) {
+                if (data && data.error) {
+                    setDisplay('Error');
+                    setExpression(data.error);
+                    pendingNum = null;
+                    pendingOp = null;
+                    currentInput = '';
+                    justCalculated = true;
+                    return;
                 }
-            } else {
-                if (currentOperand1) {
-                    currentOperand1 = currentOperand1.slice(0, -1);
-                    updateDisplay(currentOperand1);
-                }
+                var result = data.result;
+                var displayResult = (result % 1 === 0) ? String(result) : String(parseFloat(result.toFixed(10)));
+
+                setDisplay(displayResult);
+                setExpression(expression + ' =');
+
+                history.push(expression + ' = ' + displayResult);
+                if (history.length > 5) history.shift();
+                updateHistoryPanel();
+
+                pendingNum = null;
+                pendingOp = null;
+                currentInput = displayResult;
+                justCalculated = true;
+
+                if (typeof callback === 'function') callback(result);
+            },
+            error: function (xhr) {
+                var msg = 'Calculation error';
+                try {
+                    var body = JSON.parse(xhr.responseText);
+                    if (body && body.error) msg = body.error;
+                } catch (e) { /* ignore */ }
+                setDisplay('Error');
+                setExpression(msg);
+                pendingNum = null;
+                pendingOp = null;
+                currentInput = '';
+                justCalculated = true;
             }
-        }
+        });
+    }
 
-        function handleDot() {
-            if (isEnteringSecond) {
-                if (currentOperand2.indexOf('.') === -1) {
-                    currentOperand2 += (currentOperand2 ? '' : '0') + '.';
-                    updateDisplay(currentOperand1 + ' ' + getDisplayOp(operator) + ' ' + currentOperand2);
-                }
-            } else {
-                if (currentOperand1.indexOf('.') === -1) {
-                    currentOperand1 += (currentOperand1 ? '' : '0') + '.';
-                    updateDisplay(currentOperand1);
-                }
-            }
-        }
+    /* ── Event delegation (Skill 11) ── */
+    AJS.$(document).ready(function () {
+        AJS.$('.calc-grid').on('click', '.calc-btn', function () {
+            var $btn = AJS.$(this);
+            var action = $btn.data('action');
+            var value  = $btn.data('value');
 
-        function calculate(callback) {
-            if (!currentOperand1 || !operator || !currentOperand2) return;
-
-            $display.addClass('loading');
-
-            $.ajax({
-                url: AJS.contextPath() + '/rest/calculator/1.0/calculate',
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({
-                    operand1: currentOperand1,
-                    operator: operator,
-                    operand2: currentOperand2
-                }),
-                success: function(response) {
-                    if (response.error) {
-                        AJS.messages.error({ title: "Error", body: response.error });
-                        clear();
-                    } else {
-                        var expr = currentOperand1 + ' ' + getDisplayOp(operator) + ' ' + currentOperand2 + ' = ' + response.result;
-                        addHistory(expr);
-                        
-                        currentOperand1 = String(response.result);
-                        operator = '';
-                        currentOperand2 = '';
-                        isEnteringSecond = false;
-                        updateDisplay(currentOperand1);
-                        if (callback) callback();
-                    }
-                },
-                error: function(xhr) {
-                    var errorMsg = "Calculation failed";
-                    try {
-                        var res = JSON.parse(xhr.responseText);
-                        if (res.error) errorMsg = res.error;
-                    } catch(e) {}
-                    AJS.messages.error({ title: "Error", body: errorMsg });
-                },
-                complete: function() {
-                    $display.removeClass('loading');
-                }
-            });
-        }
-
-        function clear() {
-            currentOperand1 = '';
-            operator = '';
-            currentOperand2 = '';
-            isEnteringSecond = false;
-            updateDisplay('0');
-        }
-
-        function addHistory(expr) {
-            history.unshift(expr);
-            if (history.length > 5) history.pop();
-            renderHistory();
-        }
-
-        function renderHistory() {
-            $historyList.empty();
-            if (history.length === 0) {
-                $historyList.append('<li class="history-empty">No history yet</li>');
-            } else {
-                history.forEach(function(entry) {
-                    $('<li>').text(entry).appendTo($historyList);
-                });
-            }
-        }
-
-        // --- Event Delegation ---
-        $('.calc-grid').on('click', '.calc-btn', function(e) {
-            e.preventDefault();
-            var $btn = $(this);
-            
-            if ($btn.hasClass('btn-num')) {
-                handleDigit($btn.text().trim());
-            } else if ($btn.hasClass('btn-op')) {
-                if ($btn.hasClass('btn-backspace')) {
-                    handleBackspace();
-                } else if ($btn.text().trim() === '.') {
-                    handleDot();
-                } else {
-                    // Get operator from data-op or just the text
-                    var op = $btn.data('op') || $btn.text().trim();
-                    // Map display symbols back to internal operators
-                    if (op === '÷') op = '/';
-                    if (op === '×') op = '*';
-                    if (op === '−') op = '-';
-                    handleOperator(op);
-                }
-            } else if ($btn.hasClass('btn-clear')) {
-                clear();
-            } else if ($btn.hasClass('btn-equals')) {
-                calculate();
+            switch (action) {
+                case 'number':
+                    appendDigit(String(value));
+                    break;
+                case 'decimal':
+                    appendDecimal();
+                    break;
+                case 'sign':
+                    toggleSign();
+                    break;
+                case 'clear':
+                    clearAll();
+                    break;
+                case 'operator':
+                    selectOperator(String(value));
+                    break;
+                case 'equals':
+                    calculate();
+                    break;
             }
         });
 
-        // Keyboard support (Bonus for better UX)
-        $(document).on('keydown', function(e) {
-            if (!$display.is(':visible')) return;
-            
-            var key = e.key;
-            if (/[0-9]/.test(key)) handleDigit(key);
-            else if (['+', '-', '*', '/'].indexOf(key) !== -1) handleOperator(key);
-            else if (key === 'Enter' || key === '=') calculate();
-            else if (key === 'Escape' || key.toLowerCase() === 'c') clear();
-            else if (key === 'Backspace') handleBackspace();
-            else if (key === '.') handleDot();
-        });
+        updateHistoryPanel();
     });
-})(AJS.$);
+
+}());

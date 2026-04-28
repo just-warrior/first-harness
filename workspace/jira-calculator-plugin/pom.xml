@@ -1,92 +1,87 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.example</groupId>
     <artifactId>jira-calculator-plugin</artifactId>
-    <version>1.4.0</version>
+    <version>1.0.3</version>
     <packaging>atlassian-plugin</packaging>
 
-    <name>Jira Calculator Plugin</name>
-    <description>A calculator plugin for Jira administrators</description>
+    <name>Jira Admin Calculator Plugin</name>
+    <description>A standard calculator plugin for Jira administrators.</description>
 
     <properties>
         <jira.version>10.3.4</jira.version>
         <amps.version>9.1.1</amps.version>
-        <spring.scanner.version>3.0.4</spring.scanner.version>
-        <atlassian.plugin.key>${project.groupId}.${project.artifactId}</atlassian.plugin.key>
+        <spring.scanner.version>3.0.0</spring.scanner.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
+        <atlassian.plugin.key>${project.groupId}.${project.artifactId}</atlassian.plugin.key>
     </properties>
 
     <dependencies>
+        <!-- Jira API -->
         <dependency>
             <groupId>com.atlassian.jira</groupId>
             <artifactId>jira-api</artifactId>
             <version>${jira.version}</version>
             <scope>provided</scope>
         </dependency>
+
+        <!-- JSR-330 -->
         <dependency>
-            <groupId>opensymphony</groupId>
-            <artifactId>webwork</artifactId>
-            <version>1.4-atlassian-30</version>
+            <groupId>javax.inject</groupId>
+            <artifactId>javax.inject</artifactId>
+            <version>1</version>
             <scope>provided</scope>
         </dependency>
-        <dependency>
-            <groupId>com.atlassian.jira</groupId>
-            <artifactId>jira-core</artifactId>
-            <version>${jira.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.atlassian.plugins.rest</groupId>
-            <artifactId>atlassian-rest-common</artifactId>
-            <version>7.0.0</version>
-            <scope>provided</scope>
-        </dependency>
+
+        <!-- JAX-RS 2.x (javax, not jakarta) — PITFALL-03 준수 -->
         <dependency>
             <groupId>javax.ws.rs</groupId>
             <artifactId>javax.ws.rs-api</artifactId>
             <version>2.1.1</version>
             <scope>provided</scope>
         </dependency>
+
+        <!-- WebWork — PITFALL-04 준수 -->
         <dependency>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
-            <version>4.0.1</version>
+            <groupId>opensymphony</groupId>
+            <artifactId>webwork</artifactId>
+            <version>1.4-atlassian-30</version>
             <scope>provided</scope>
         </dependency>
+
+        <!-- Spring Scanner -->
         <dependency>
             <groupId>com.atlassian.plugin</groupId>
             <artifactId>atlassian-spring-scanner-annotation</artifactId>
             <version>${spring.scanner.version}</version>
             <scope>provided</scope>
         </dependency>
-        <!-- Test dependencies -->
+
+        <!-- JSON (Jackson) -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.13.4</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Test -->
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <version>4.13.2</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <version>4.11.0</version>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>
-        <resources>
-            <resource>
-                <directory>src/main/resources</directory>
-                <filtering>true</filtering>
-            </resource>
-        </resources>
         <plugins>
             <plugin>
                 <groupId>com.atlassian.maven.plugins</groupId>
@@ -102,30 +97,39 @@
                         <Export-Package/>
                         <Import-Package>
                             com.atlassian.jira.web.action,
-                            com.atlassian.jira.security,
-                            com.atlassian.jira.security.request,
-                            com.atlassian.jira.component,
                             webwork.action,
                             javax.ws.rs,
                             javax.ws.rs.core,
+                            javax.ws.rs.ext,
+                            org.slf4j,
                             *
                         </Import-Package>
-                        <Spring-Context>*</Spring-Context>
+                        <Spring-Scanner-Version>${spring.scanner.version}</Spring-Scanner-Version>
                     </instructions>
                 </configuration>
             </plugin>
+
             <plugin>
                 <groupId>com.atlassian.plugin</groupId>
                 <artifactId>atlassian-spring-scanner-maven-plugin</artifactId>
                 <version>${spring.scanner.version}</version>
                 <executions>
                     <execution>
+                        <phase>process-classes</phase>
                         <goals>
                             <goal>atlassian-spring-scanner</goal>
                         </goals>
-                        <phase>process-classes</phase>
                     </execution>
                 </executions>
+                <configuration>
+                    <scannedDependencies>
+                        <dependency>
+                            <groupId>com.atlassian.plugin</groupId>
+                            <artifactId>atlassian-spring-scanner-external-jar</artifactId>
+                        </dependency>
+                    </scannedDependencies>
+                    <verbose>false</verbose>
+                </configuration>
             </plugin>
         </plugins>
     </build>

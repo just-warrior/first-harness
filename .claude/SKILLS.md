@@ -258,5 +258,49 @@ OSGi는 직접 import한 패키지뿐 아니라 **클래스 계층에서 간접 
 ## ⚡ Skill 11: Front-end Event Handling & Scoping
 - **Inline Handlers 금지**: HTML/Velocity 템플릿 내부에 `onclick="..."` 등의 인라인 이벤트 핸들러를 절대 사용하지 마십시오. JS가 IIFE(즉시 실행 함수)로 캡슐화될 경우 전역 스코프를 찾지 못해 `ReferenceError`가 발생합니다.
 - **Event Delegation 사용**: 버튼 등 동적 요소의 이벤트는 `data-*` 속성을 활용하고, JavaScript 파일 내부에서 `AJS.$` (jQuery)를 이용한 이벤트 위임(Event Delegation) 방식으로 바인딩하십시오.
-  - *예시 (HTML)*: `<button class="aui-button calc-btn" data-action="clear">C</button>`
+  - *예시 (HTML)*: `<button class="calc-btn" data-action="clear">C</button>` ← **`aui-button` 클래스 없음** (PITFALL-05 참조)
   - *예시 (JS)*: `AJS.$('.calc-grid').on('click', '.calc-btn', function(e) { ... });`
+
+---
+
+### [PITFALL-05] CSS Grid 버튼에 `aui-button` 클래스 적용 금지
+
+**증상:** CSS Grid(`display: grid`)로 구성한 계산기 버튼들이 격자 구조를 무시하고 일렬로 늘어서거나, 버튼 크기·색상이 커스텀 CSS 대신 AUI 기본 스타일로 렌더링된다.
+
+**원인:**
+AUI의 `.aui-button` 클래스는 `display: inline-flex`, 고정 padding, border, background-color 등을 자체 스타일시트에 지정한다.  
+이 규칙들은 플러그인 CSS보다 **로딩 순서상 나중에 적용**되거나 **선택자 특이도(specificity)가 높아** 커스텀 Grid 레이아웃 및 색상을 덮어쓴다.
+
+| 클래스 조합 | 결과 |
+|---|---|
+| `aui-button` + CSS Grid 컨테이너 | ❌ 버튼이 일렬로 늘어서거나 AUI 색으로 고정됨 |
+| 커스텀 클래스만 + `!important` | ✅ CSS Grid 정상 작동, 커스텀 색상 적용 |
+
+**올바른 패턴:**
+
+```html
+<!-- ❌ 잘못된 예: aui-button 클래스가 Grid 레이아웃을 방해함 -->
+<button class="aui-button aui-button-primary calc-btn calc-btn-operator" data-action="operator" data-value="/">÷</button>
+
+<!-- ✅ 올바른 예: 커스텀 클래스만 사용, CSS에서 !important로 AUI 오버라이드 -->
+<button class="calc-btn calc-btn-operator" data-action="operator" data-value="/">÷</button>
+```
+
+```css
+/* CSS에서 핵심 레이아웃 속성에 !important 적용 */
+.calc-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+}
+.calc-grid .calc-btn {
+    display: flex !important;
+    width: 100% !important;
+    margin: 0 !important;
+    border: none !important;
+}
+```
+
+**체크리스트:**
+- [ ] CSS Grid 컨테이너 내부 버튼에 `aui-button` 또는 `aui-button-primary` 클래스가 없는가?
+- [ ] `.calc-grid`에 `display: grid !important`가 선언되어 있는가?
+- [ ] `.calc-grid .calc-btn`에 `width: 100% !important`, `margin: 0 !important`가 선언되어 있는가?

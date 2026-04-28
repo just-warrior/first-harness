@@ -17,7 +17,7 @@ Jira DC Version 은 10.3.4 이다.
 
 ### 3.2 프론트엔드 UI/UX (Frontend UI)
 - **레이아웃 기술:** CSS Grid를 사용하여 윈도우 기본 계산기와 동일한 격자 구조(Grid Layout)로 버튼을 배치한다. 버튼이 일렬로 늘어서지 않도록 CSS 클래스로 강제한다.
-- **디자인 시스템:** AUI(Atlassian User Interface)의 버튼 스타일(`aui-button`)과 폼(`text`) 스타일을 적용하되, 레이아웃 배치는 CSS Grid를 우선한다.
+- **디자인 시스템:** 페이지 레이아웃(`.aui-page-panel`, `.aui-page-header`)에는 AUI 클래스를 사용한다. 단, 계산기 격자 버튼에는 `aui-button` 클래스를 **사용하지 않는다** — AUI 버튼 스타일이 CSS Grid 레이아웃을 덮어쓰기 때문이다. 버튼은 커스텀 클래스(`calc-btn`, `calc-btn-number` 등)만 사용하고 CSS에서 `!important`로 AUI 오버라이드를 명시한다.
 - **이력 저장:** 브라우저 내의 JavaScript 배열(메모리)을 사용하여 최대 5개의 최근 연산 기록(예: "5 + 3 = 8")을 저장하고 화면 패널에 표시한다.
 
 ### 3.3 백엔드 연산 로직 (Backend REST API)

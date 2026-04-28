@@ -1,39 +1,49 @@
-<atlassian-plugin key="com.example.jira-calculator-plugin" name="${project.name}" plugins-version="2">
+<?xml version="1.0" encoding="UTF-8"?>
+<atlassian-plugin key="${atlassian.plugin.key}" name="${project.name}" plugins-version="2">
     <plugin-info>
         <description>${project.description}</description>
         <version>${project.version}</version>
         <vendor name="Example Corp" url="https://example.com"/>
+        <param name="plugin-icon">images/pluginIcon.png</param>
+        <param name="plugin-logo">images/pluginLogo.png</param>
     </plugin-info>
 
-    <!-- Web Resources: CSS and JS -->
-    <web-resource key="calculator-resources" name="Calculator Web Resources">
-        <dependency>com.atlassian.auiplugin:ajs</dependency>
-        <resource type="download" name="jira-calculator-plugin.css" location="/css/jira-calculator-plugin.css"/>
-        <resource type="download" name="jira-calculator-plugin.js" location="/js/jira-calculator-plugin.js"/>
-        <context>calculator</context>
-    </web-resource>
+    <!-- i18n 리소스 -->
+    <resource type="i18n" name="i18n" location="jira-calculator-plugin"/>
 
-    <!-- Web Section: Admin sidebar section -->
-    <web-section key="calculator-section"
-                 name="Calculator Section"
-                 location="admin_plugins_menu"
-                 weight="100">
-        <label key="section.label"/>
+    <!-- ===== Web Fragment: 관리자 사이드바 메뉴 ===== -->
+    <!-- PITFALL-01 준수: 커스텀 섹션 → web-item 구조 -->
+    <web-section
+        key="calculator-section"
+        location="admin_plugins_menu"
+        weight="100">
+        <label key="calculator.section.label"/>
     </web-section>
 
-    <!-- Web Item: Admin sidebar menu item -->
-    <web-item key="calculator-web-item"
-              name="Calculator"
-              section="admin_plugins_menu/calculator-section"
-              weight="10">
-        <label key="menu.label"/>
+    <web-item
+        key="calculator-web-item"
+        section="admin_plugins_menu/calculator-section"
+        weight="10">
+        <label key="calculator.menu.label"/>
+        <!-- PITFALL-01 준수: !default suffix로 doDefault() 호출 -->
         <link linkId="calculator-link">/secure/CalculatorAction!default.jspa</link>
     </web-item>
 
-    <!-- WebWork1 Action -->
-    <webwork1 key="calculator-webwork" name="Calculator Action" roles-required="admin">
+    <!-- ===== Web Resource: CSS + JS ===== -->
+    <web-resource key="calculator-resources" name="Calculator Resources">
+        <dependency>com.atlassian.auiplugin:ajs</dependency>
+        <resource type="download" name="jira-calculator-plugin.css"
+                  location="css/jira-calculator-plugin.css"/>
+        <resource type="download" name="jira-calculator-plugin.js"
+                  location="js/jira-calculator-plugin.js"/>
+        <context>calculator</context>
+    </web-resource>
+
+    <!-- ===== WebWork1 Action ===== -->
+    <webwork1 key="calculator-action" name="Calculator Action">
         <actions>
-            <action name="com.example.jiracalculator.action.CalculatorAction" alias="CalculatorAction">
+            <action name="com.example.jiracalculator.action.CalculatorAction"
+                    alias="CalculatorAction">
                 <view name="success">/templates/calculator/calculator.vm</view>
                 <view name="input">/templates/calculator/calculator.vm</view>
                 <view name="error">/templates/calculator/error.vm</view>
@@ -41,13 +51,12 @@
         </actions>
     </webwork1>
 
-    <!-- REST Module -->
-    <rest key="calculator-rest" name="Calculator REST API" path="/calculator" version="1.0">
-        <description>REST API for calculator operations</description>
+    <!-- ===== REST Module ===== -->
+    <!-- PITFALL-03 준수: javax.ws.rs 기반, @Named 없이 패키지 스캔으로 등록 -->
+    <rest key="calculator-rest" path="/calculator" version="1.0"
+          name="Calculator REST API">
+        <description>Calculator REST API for arithmetic operations.</description>
         <package>com.example.jiracalculator.rest</package>
     </rest>
-
-    <!-- i18n Resource -->
-    <resource type="i18n" name="i18n" location="jira-calculator-plugin"/>
 
 </atlassian-plugin>
