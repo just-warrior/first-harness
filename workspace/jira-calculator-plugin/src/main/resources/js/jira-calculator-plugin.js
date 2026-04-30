@@ -1,194 +1,155 @@
 (function () {
     'use strict';
 
-    /* ── State ── */
-    var currentInput = '';
-    var pendingNum = null;
-    var pendingOp = null;
-    var justCalculated = false;
+    var state = {
+        currentInput: '0',
+        operand1: null,
+        operator: null,
+        waitingForSecond: false,
+        expression: ''
+    };
+
     var history = [];
 
-    /* ── DOM helpers ── */
-    function setDisplay(val) {
-        AJS.$('#calc-display').text(String(val));
+    function updateDisplay() {
+        AJS.$('#calc-current').text(state.currentInput);
+        AJS.$('#calc-expression').text(state.expression || ' ');
     }
 
-    function setExpression(val) {
-        AJS.$('#calc-expression').text(val || ' ');
+    function formatNumber(num) {
+        var str = String(num);
+        if (str.indexOf('.') !== -1) {
+            str = str.replace(/\.?0+$/, '');
+        }
+        return str || '0';
     }
 
-    function updateHistoryPanel() {
+    function appendHistory(entry) {
+        history.unshift(entry);
+        if (history.length > 5) {
+            history.pop();
+        }
         var $list = AJS.$('#calc-history-list');
         $list.empty();
-        if (history.length === 0) {
-            $list.append('<li class="calc-history-empty">No calculations yet.</li>');
+        AJS.$.each(history, function (i, item) {
+            $list.append('<li>' + item + '</li>');
+        });
+    }
+
+    function handleNumber(value) {
+        if (state.waitingForSecond) {
+            state.currentInput = value;
+            state.waitingForSecond = false;
+        } else {
+            state.currentInput = state.currentInput === '0' ? value : state.currentInput + value;
+        }
+        updateDisplay();
+    }
+
+    function handleOperator(value) {
+        state.operand1 = state.currentInput;
+        state.operator = value;
+        state.expression = state.currentInput + ' ' + value;
+        state.waitingForSecond = true;
+        updateDisplay();
+    }
+
+    function handleClear() {
+        state.currentInput = '0';
+        state.operand1 = null;
+        state.operator = null;
+        state.waitingForSecond = false;
+        state.expression = '';
+        updateDisplay();
+    }
+
+    function handleDecimal() {
+        if (state.waitingForSecond) {
+            state.currentInput = '0.';
+            state.waitingForSecond = false;
+        } else if (state.currentInput.indexOf('.') === -1) {
+            state.currentInput += '.';
+        }
+        updateDisplay();
+    }
+
+    function handleSign() {
+        if (state.currentInput !== '0') {
+            state.currentInput = state.currentInput.charAt(0) === '-'
+                ? state.currentInput.slice(1)
+                : '-' + state.currentInput;
+            updateDisplay();
+        }
+    }
+
+    function handlePercent() {
+        var val = parseFloat(state.currentInput);
+        if (!isNaN(val)) {
+            state.currentInput = formatNumber(val / 100);
+            updateDisplay();
+        }
+    }
+
+    function handleEquals() {
+        if (state.operand1 === null || state.operator === null) {
             return;
         }
-        for (var i = history.length - 1; i >= 0; i--) {
-            $list.append('<li>' + AJS.escapeHtml(history[i]) + '</li>');
-        }
-    }
 
-    /* ── Input helpers ── */
-    function appendDigit(digit) {
-        if (justCalculated) {
-            currentInput = digit;
-            justCalculated = false;
-        } else {
-            if (currentInput === '0' && digit !== '.') {
-                currentInput = digit;
-            } else {
-                currentInput += digit;
-            }
-        }
-        setDisplay(currentInput || '0');
-    }
-
-    function appendDecimal() {
-        if (justCalculated) {
-            currentInput = '0.';
-            justCalculated = false;
-        } else if (currentInput.indexOf('.') === -1) {
-            currentInput = (currentInput || '0') + '.';
-        }
-        setDisplay(currentInput);
-    }
-
-    function toggleSign() {
-        if (!currentInput || currentInput === '0') return;
-        if (currentInput.charAt(0) === '-') {
-            currentInput = currentInput.slice(1);
-        } else {
-            currentInput = '-' + currentInput;
-        }
-        setDisplay(currentInput);
-    }
-
-    function clearAll() {
-        currentInput = '';
-        pendingNum = null;
-        pendingOp = null;
-        justCalculated = false;
-        setDisplay('0');
-        setExpression('');
-    }
-
-    function selectOperator(op) {
-        if (currentInput === '' && pendingNum !== null) {
-            pendingOp = op;
-            setExpression(String(pendingNum) + ' ' + op);
-            return;
-        }
-        if (currentInput !== '') {
-            if (pendingNum !== null && pendingOp !== null) {
-                calculate(function (result) {
-                    pendingNum = result;
-                    pendingOp = op;
-                    currentInput = '';
-                    justCalculated = false;
-                    setDisplay(String(result));
-                    setExpression(String(result) + ' ' + op);
-                });
-                return;
-            }
-            pendingNum = parseFloat(currentInput);
-            pendingOp = op;
-            setExpression(currentInput + ' ' + op);
-            currentInput = '';
-        }
-    }
-
-    /* ── REST call ── */
-    function calculate(callback) {
-        if (pendingNum === null || pendingOp === null || currentInput === '') return;
-
-        var payload = {
-            num1: String(pendingNum),
-            num2: currentInput,
-            operator: pendingOp
-        };
-
-        var expression = String(pendingNum) + ' ' + pendingOp + ' ' + currentInput;
+        var operand2 = state.currentInput;
+        var expression = state.operand1 + ' ' + state.operator + ' ' + operand2;
 
         AJS.$.ajax({
             url: AJS.contextPath() + '/rest/calculator/1.0/calculate',
             type: 'POST',
             contentType: 'application/json',
-            dataType: 'json',
-            data: JSON.stringify(payload),
-            success: function (data) {
-                if (data && data.error) {
-                    setDisplay('Error');
-                    setExpression(data.error);
-                    pendingNum = null;
-                    pendingOp = null;
-                    currentInput = '';
-                    justCalculated = true;
-                    return;
+            data: JSON.stringify({
+                operand1: state.operand1,
+                operator: state.operator,
+                operand2: operand2
+            }),
+            success: function (response) {
+                if (response.error) {
+                    state.currentInput = 'Error';
+                    state.expression = response.error;
+                } else {
+                    var resultStr = formatNumber(response.result);
+                    appendHistory(expression + ' = ' + resultStr);
+                    state.currentInput = resultStr;
+                    state.expression = expression + ' =';
                 }
-                var result = data.result;
-                var displayResult = (result % 1 === 0) ? String(result) : String(parseFloat(result.toFixed(10)));
-
-                setDisplay(displayResult);
-                setExpression(expression + ' =');
-
-                history.push(expression + ' = ' + displayResult);
-                if (history.length > 5) history.shift();
-                updateHistoryPanel();
-
-                pendingNum = null;
-                pendingOp = null;
-                currentInput = displayResult;
-                justCalculated = true;
-
-                if (typeof callback === 'function') callback(result);
+                state.operand1 = null;
+                state.operator = null;
+                state.waitingForSecond = false;
+                updateDisplay();
             },
-            error: function (xhr) {
-                var msg = 'Calculation error';
-                try {
-                    var body = JSON.parse(xhr.responseText);
-                    if (body && body.error) msg = body.error;
-                } catch (e) { /* ignore */ }
-                setDisplay('Error');
-                setExpression(msg);
-                pendingNum = null;
-                pendingOp = null;
-                currentInput = '';
-                justCalculated = true;
+            error: function () {
+                state.currentInput = 'Error';
+                state.expression = 'Request failed';
+                state.operand1 = null;
+                state.operator = null;
+                state.waitingForSecond = false;
+                updateDisplay();
             }
         });
     }
 
-    /* ── Event delegation (Skill 11) ── */
     AJS.$(document).ready(function () {
+        updateDisplay();
+
         AJS.$('.calc-grid').on('click', '.calc-btn', function () {
             var $btn = AJS.$(this);
             var action = $btn.data('action');
-            var value  = $btn.data('value');
+            var value = $btn.data('value');
 
             switch (action) {
-                case 'number':
-                    appendDigit(String(value));
-                    break;
-                case 'decimal':
-                    appendDecimal();
-                    break;
-                case 'sign':
-                    toggleSign();
-                    break;
-                case 'clear':
-                    clearAll();
-                    break;
-                case 'operator':
-                    selectOperator(String(value));
-                    break;
-                case 'equals':
-                    calculate();
-                    break;
+                case 'number':   handleNumber(String(value)); break;
+                case 'operator': handleOperator(value); break;
+                case 'clear':    handleClear(); break;
+                case 'decimal':  handleDecimal(); break;
+                case 'sign':     handleSign(); break;
+                case 'percent':  handlePercent(); break;
+                case 'equals':   handleEquals(); break;
             }
         });
-
-        updateHistoryPanel();
     });
-
 }());

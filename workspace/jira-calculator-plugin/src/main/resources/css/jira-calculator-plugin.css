@@ -1,170 +1,130 @@
-/* =====================================================
-   Jira Admin Calculator Plugin — CSS
-   PITFALL-05: .calc-grid 내부 버튼에 aui-button 클래스
-   없음. !important로 AUI 스타일 오버라이드 명시.
-   ===================================================== */
-
-/* ── Container ── */
-#calculator-container {
-    max-width: 300px;
-    margin: 0 auto;
-    padding: 16px 0;
+/* ===== Calculator Container ===== */
+.calc-container {
+    max-width: 320px;
+    margin: 20px 0;
 }
 
-/* ── Display ── */
-#calc-display-wrapper {
-    background: #1e1e2e;
-    border-radius: 8px 8px 0 0;
-    padding: 12px 16px 8px;
-    min-height: 72px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    justify-content: flex-end;
+/* ===== Display ===== */
+.calc-display {
+    background: #1e1e1e;
+    color: #fff;
+    padding: 16px;
+    font-size: 24px;
+    text-align: right;
+    border-radius: 4px 4px 0 0;
+    min-height: 70px;
+    overflow: hidden;
+    word-break: break-all;
+}
+
+.calc-display .calc-expression {
+    font-size: 13px;
+    color: #aaa;
+    min-height: 18px;
     margin-bottom: 4px;
 }
 
-#calc-expression {
-    color: #888;
-    font-size: 13px;
-    min-height: 18px;
-    word-break: break-all;
-    text-align: right;
-}
-
-#calc-display {
-    color: #ffffff;
-    font-size: 32px;
-    font-weight: 300;
-    word-break: break-all;
-    text-align: right;
-    line-height: 1.1;
-}
-
-/* ── CSS Grid Layout (PITFALL-05 compliant) ── */
+/* ===== Grid Layout — PITFALL-05: !important to override AUI ===== */
 .calc-grid {
     display: grid !important;
     grid-template-columns: repeat(4, 1fr) !important;
-    gap: 4px !important;
-    background: #2a2a3a;
-    padding: 4px;
-    border-radius: 0 0 8px 8px;
+    gap: 2px !important;
+    background: #d4d4d2;
+    border: 1px solid #d4d4d2;
 }
 
-/* ── Base Button Reset ── */
 .calc-grid .calc-btn {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     width: 100% !important;
-    height: 64px !important;
+    height: 60px !important;
     margin: 0 !important;
-    padding: 0 !important;
     border: none !important;
-    border-radius: 4px !important;
-    font-size: 20px !important;
-    font-weight: 500 !important;
-    line-height: 1 !important;
+    font-size: 18px !important;
     cursor: pointer !important;
+    background: #f5f5f5 !important;
+    color: #333 !important;
     box-sizing: border-box !important;
-    transition: filter 0.1s ease !important;
-    /* Reset any AUI box-shadow or outline */
-    box-shadow: none !important;
-    outline: none !important;
-    text-decoration: none !important;
+    border-radius: 0 !important;
+    transition: background 0.1s !important;
 }
 
 .calc-grid .calc-btn:hover {
-    filter: brightness(1.15) !important;
+    background: #e0e0e0 !important;
 }
 
 .calc-grid .calc-btn:active {
-    filter: brightness(0.80) !important;
-    transform: scale(0.97) !important;
+    background: #c8c8c8 !important;
 }
 
-/* ── Number Buttons ── */
-.calc-grid .calc-btn-number {
-    background-color: #3c3c50 !important;
-    color: #e0e0e0 !important;
-}
-
-/* ── Operator Buttons (+, -, *, /) ── */
 .calc-grid .calc-btn-operator {
-    background-color: #ff9f0a !important;
-    color: #ffffff !important;
+    background: #ff9f0a !important;
+    color: #fff !important;
 }
 
-/* ── Clear Button ── */
-.calc-grid .calc-btn-clear {
-    background-color: #636366 !important;
-    color: #ffffff !important;
+.calc-grid .calc-btn-operator:hover {
+    background: #ffb340 !important;
 }
 
-/* ── Sign Button (±) ── */
-.calc-grid .calc-btn-sign {
-    background-color: #636366 !important;
-    color: #ffffff !important;
-}
-
-/* ── Decimal Button ── */
-.calc-grid .calc-btn-decimal {
-    background-color: #3c3c50 !important;
-    color: #e0e0e0 !important;
-}
-
-/* ── Equals Button — spans rows 4 and 5 in column 4 ── */
 .calc-grid .calc-btn-equals {
-    background-color: #ff9f0a !important;
-    color: #ffffff !important;
-    grid-row: span 2 !important;
-    height: 100% !important;
-    min-height: 132px !important;
+    background: #ff9f0a !important;
+    color: #fff !important;
 }
 
-/* ── Zero Button — spans columns 1 and 2 ── */
-.calc-grid .calc-btn-zero {
+.calc-grid .calc-btn-equals:hover {
+    background: #ffb340 !important;
+}
+
+.calc-grid .calc-btn-clear {
+    background: #a5a5a5 !important;
+    color: #333 !important;
+}
+
+.calc-grid .calc-btn-clear:hover {
+    background: #bdbdbd !important;
+}
+
+.calc-grid .calc-btn-wide {
     grid-column: span 2 !important;
-    justify-content: flex-start !important;
-    padding-left: 22px !important;
 }
 
-/* ── History Panel ── */
-#calc-history-panel {
-    margin-top: 20px;
-    padding: 12px 16px;
-    background: #f4f5f7;
-    border-radius: 4px;
-    border: 1px solid #dfe1e6;
+/* ===== History Panel ===== */
+.calc-history {
+    margin-top: 24px;
+    max-width: 320px;
 }
 
-#calc-history-panel h3 {
-    margin: 0 0 8px;
-    font-size: 11px;
-    font-weight: 700;
-    color: #42526e;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+.calc-history h3 {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #333;
 }
 
-#calc-history-list {
+.calc-history ul {
     list-style: none;
     margin: 0;
     padding: 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fafafa;
 }
 
-#calc-history-list li {
-    padding: 5px 0;
+.calc-history ul li {
+    padding: 8px 12px;
     font-size: 13px;
-    color: #172b4d;
-    border-bottom: 1px solid #ebecf0;
+    color: #555;
+    border-bottom: 1px solid #eee;
 }
 
-#calc-history-list li:last-child {
+.calc-history ul li:last-child {
     border-bottom: none;
 }
 
-.calc-history-empty {
-    color: #97a0af !important;
+.calc-history .history-empty {
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #999;
     font-style: italic;
 }

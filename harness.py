@@ -10,19 +10,26 @@ import time
 
 class SmartOrchestrator:
     """
-    Plan Once, Execute Consistently (POEC) 하네스 v4.
-    v4 개선:
-    - P0: NEW 인텐트 시 플랜 생성 성공 후 아카이브 (데이터 손실 방지)
-    - P0: 재시도 시 실패 원인 프롬프트 주입
-    - P1: 파일 커버리지 검증 full-path suffix 매칭
-    - P1: REQUIREMENTS.md + SKILLS.md 복합 해시 추적
-    - P2: 챕터 관련 파일만 전체 내용 주입 (선택적 매니페스트)
-    - P2: FIX_HISTORY.md 플랜 생성 프롬프트 주입
-    - P3: 챕터 실행 시간 추적
-    - P3: analyze_intent() 결과 캐싱
+    Plan Once, Execute Consistently (POEC) 하네스 v5.
+    v5 개선:
+    - P0: subprocess 에러 핸들링 + 타임아웃
+    - P0: 챕터별 린트 검증 (SKILLS.md 규칙 위반 자동 탐지)
+    - P0: 빌드 검증 챕터 하네스 직접 실행 (LLM 불필요)
+    - P0: 챕터 간 파일 수정 범위 제한 지시
+    - P1: 이전 챕터 요약 주입 (챕터 간 일관성)
+    - (v4 기능 모두 포함)
     """
 
     MAX_RETRIES = 2
+    SUBPROCESS_TIMEOUT = 600  # 10분
+    EXCLUDE_DIRS = ("target", ".osgi-plugins", ".idea")
+
+    # 챕터별 린트 규칙: (파일 확장자, 탐지 문자열, 위반 설명)
+    LINT_RULES = [
+        (".java", "import jakarta.", "jakarta.* 패키지 사용 금지 (Skill 8, PITFALL-03)"),
+        (".xml", 'version="*"', 'Import-Package version="*" 사용 금지 (PITFALL-02)'),
+        (".vm", "onclick=", "인라인 onclick 핸들러 사용 금지 (Skill 11)"),
+    ]
 
     def __init__(self):
         self.base_dir = os.getcwd()
@@ -197,10 +204,18 @@ class SmartOrchestrator:
 
 JSON 배열만 출력하세요:"""
 
-        result = subprocess.run(
-            ["claude", "-p", prompt],
-            capture_output=True, text=True, cwd=self.base_dir,
-        )
+        try:
+            result = subprocess.run(
+                ["claude", "-p", prompt],
+                capture_output=True, text=True, cwd=self.base_dir,
+                timeout=self.SUBPROCESS_TIMEOUT,
+            )
+        except FileNotFoundError:
+            print("❌ 'claude' CLI를 찾을 수 없습니다. PATH를 확인하세요.")
+            return None
+        except subprocess.TimeoutExpired:
+            print("❌ AI 응답 타임아웃. 네트워크를 확인하세요.")
+            return None
 
         match = re.search(r'\[\s*\{.*\}\s*\]', result.stdout, re.DOTALL)
         if not match:
@@ -253,7 +268,15 @@ JSON 배열만 출력하세요:"""
 
 반드시 'INTENT: [NEW/INCREMENTAL]' 형식으로 답변을 시작하고 이유를 짧게 적으세요."""
 
-        result = subprocess.run(["claude", "-p", prompt], capture_output=True, text=True)
+        try:
+            result = subprocess.run(
+                ["claude", "-p", prompt],
+                capture_output=True, text=True,
+                timeout=self.SUBPROCESS_TIMEOUT,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            print("⚠️ AI 의도 분석 실패. INCREMENTAL로 기본 처리합니다.")
+            return "INCREMENTAL"
         intent = "INCREMENTAL"
         if result.stdout and "INTENT: NEW" in result.stdout.upper():
             intent = "NEW"
@@ -307,7 +330,10 @@ JSON 배열만 출력하세요:"""
         # 2. P2: 현재 챕터 관련 파일만 전체 내용, 나머지는 경로 목록
         workspace_state = self.get_workspace_manifest(chapter_info)
 
-        # 3. P0: 재시도 시 실패 원인 주입
+        # 3. P4: 이전 챕터 실행 결과 주입 (챕터 간 일관성)
+        chapter_summaries = self._get_chapter_summaries(chapter_num)
+
+        # 4. P0: 재시도 시 실패 원인 주입
         failure_section = ""
         if failure_context:
             failure_section = f"""
@@ -315,9 +341,11 @@ JSON 배열만 출력하세요:"""
 {failure_context}
 """
 
+        files_instruction = ', '.join(expected_files) if expected_files else '빌드 검증만 수행'
         lean_prompt = f"""{static_context}
 
 {workspace_state}
+{chapter_summaries}
 {failure_section}
 # CURRENT GOAL: Chapter {chapter_num} - {chapter_name}
 당신은 위 가이드라인을 완벽히 숙지한 시니어 개발자입니다.
@@ -330,13 +358,14 @@ JSON 배열만 출력하세요:"""
 {description}
 
 [EXPECTED FILES TO CREATE/MODIFY]
-{', '.join(expected_files) if expected_files else '빌드 검증만 수행'}
+{files_instruction}
 
 [INSTRUCTION]
 - 모든 작업은 `workspace` 폴더 내에서 이루어져야 합니다.
 - REQUIREMENTS.md에 '파일 매니페스트' 섹션이 있다면 명시된 파일 경로를 정확히 따르세요.
 - 위 CURRENT WORKSPACE STATE에 나열된 기존 파일과 일관성을 유지하세요 (import 경로, 패키지명, 클래스명 등).
 - 기존 파일을 수정할 때는 원래 구조를 유지하면서 필요한 부분만 변경하세요.
+- ⚠️ 이번 챕터의 EXPECTED FILES에 명시된 파일만 생성/수정하세요. 다른 챕터의 파일은 수정하지 마세요.
 - 작업이 끝나면 어떤 파일이 어떻게 변경되었는지 요약하고 반드시 'CHAPTER COMPLETE'라고 명시하세요.
 """
         retry_tag = f" (재시도 {retry_count}/{self.MAX_RETRIES})" if retry_count > 0 else ""
@@ -373,6 +402,13 @@ JSON 배열만 출력하세요:"""
                 f"다음 파일이 workspace에 존재하지 않음 — 반드시 생성하세요: {missing}"
             )
 
+        # P0 v5: 린트 검증 — SKILLS.md 규칙 위반 자동 탐지
+        lint_violations = self._lint_chapter_output(expected_files)
+        if lint_violations:
+            for v in lint_violations:
+                print(f"🔍 [Lint] {v}")
+            failure_reasons.extend(lint_violations)
+
         if failure_reasons:
             if retry_count < self.MAX_RETRIES:
                 print(f"⚠️ [Chapter {chapter_num}] 실패 원인: {'; '.join(failure_reasons)}")
@@ -386,7 +422,7 @@ JSON 배열만 출력하세요:"""
                 if "CHAPTER COMPLETE" not in output_text.upper():
                     print(f"❌ [Chapter {chapter_num}] 최대 재시도 초과. 건너뜁니다.")
                     return None
-                print(f"❌ [Chapter {chapter_num}] 최대 재시도 초과. 파일 누락 상태로 계속합니다.")
+                print(f"❌ [Chapter {chapter_num}] 최대 재시도 초과. 린트 위반 또는 파일 누락 상태로 계속합니다.")
 
         return output_text
 
@@ -412,6 +448,41 @@ JSON 배열만 출력하세요:"""
             if not found:
                 missing.append(rel_path)
         return missing
+
+    def _lint_chapter_output(self, expected_files):
+        """P0 v5: 생성된 파일에서 SKILLS.md 규칙 위반 패턴을 grep으로 탐지"""
+        violations = []
+        for rel_path in expected_files:
+            filepath = os.path.join(self.workspace_dir, rel_path)
+            if not os.path.exists(filepath):
+                continue
+            try:
+                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+            except Exception:
+                continue
+
+            ext = os.path.splitext(rel_path)[1]
+
+            # 범용 린트 규칙
+            for rule_ext, pattern, desc in self.LINT_RULES:
+                if ext == rule_ext and pattern in content:
+                    violations.append(f"{rel_path}: {desc}")
+
+            # Action 전용: @Named + JiraWebActionSupport 조합 금지 (Skill 7)
+            if ext == ".java":
+                if "extends JiraWebActionSupport" in content and "@Named" in content:
+                    violations.append(
+                        f"{rel_path}: Action 클래스에 @Named 사용 금지 — Jira가 직접 인스턴스화 (Skill 7)"
+                    )
+
+            # pom.xml 전용: version="*" in Import-Package (PITFALL-02)
+            if rel_path.endswith("pom.xml") and 'version="*"' in content:
+                violations.append(f"{rel_path}: Import-Package version=\"*\" 사용 금지 (PITFALL-02)")
+
+        if violations:
+            print(f"⚠️ [Lint] {len(violations)}개 규칙 위반 감지")
+        return violations
 
     # ------------------------------------------------------------------
     # Plan Coverage
@@ -526,6 +597,57 @@ JSON 배열만 출력하세요:"""
                     f.write(line)
 
     # ------------------------------------------------------------------
+    # 빌드 검증 (하네스 직접 실행 — LLM 불필요)
+    # ------------------------------------------------------------------
+    def execute_build_verification(self):
+        """P0 v5: 빌드 검증을 하네스가 직접 수행하여 토큰 절약"""
+        # workspace 하위에서 pom.xml이 있는 프로젝트 디렉터리 탐색
+        build_dir = None
+        for entry in os.listdir(self.workspace_dir):
+            candidate = os.path.join(self.workspace_dir, entry)
+            if os.path.isdir(candidate) and os.path.exists(os.path.join(candidate, "pom.xml")):
+                build_dir = candidate
+                break
+
+        if not build_dir:
+            print("❌ [Build] pom.xml이 있는 프로젝트 디렉터리를 찾을 수 없습니다.")
+            return None
+
+        print(f"🔨 [Build] 빌드 실행: {build_dir}")
+        try:
+            result = subprocess.run(
+                ["atlas-mvn", "clean", "package", "-q"],
+                cwd=build_dir,
+                capture_output=True, text=True,
+                timeout=self.SUBPROCESS_TIMEOUT,
+            )
+        except FileNotFoundError:
+            print("❌ 'atlas-mvn' 명령을 찾을 수 없습니다. Atlassian SDK를 확인하세요.")
+            return None
+        except subprocess.TimeoutExpired:
+            print("❌ 빌드 타임아웃.")
+            return None
+
+        output = result.stdout + result.stderr
+        if result.returncode == 0:
+            print("✅ [Build] BUILD SUCCESS")
+            return f"BUILD SUCCESS\nCHAPTER COMPLETE\n{output[-1000:]}"
+        else:
+            print(f"❌ [Build] BUILD FAILURE (exit code: {result.returncode})")
+            print(output[-2000:])
+            return None
+
+    def _get_chapter_summaries(self, up_to_chapter):
+        """P4 v5: 이전 챕터 실행 결과를 주입하여 챕터 간 일관성 유지"""
+        if not os.path.exists(self.log_file):
+            return ""
+        with open(self.log_file, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+        if not content:
+            return ""
+        return f"\n# 이전 챕터 실행 결과 (참고용 — 이 파일들은 이미 완성됨, 수정 금지)\n{content}\n"
+
+    # ------------------------------------------------------------------
     # 메인 실행 루프
     # ------------------------------------------------------------------
     def run(self):
@@ -636,33 +758,17 @@ JSON 배열만 출력하세요:"""
 
         for c_num, chapter_info in sorted(pending, key=lambda x: x[0]):
             start = time.time()
-            output = self.execute_chapter(c_num, chapter_info)
-            elapsed = time.time() - start
-            if output:
-                self.update_status(c_num)
-                self.log_progress(c_num, chapter_info["chapter"], output, elapsed_seconds=elapsed)
-                print(f"✅ [Chapter {c_num}] 완료: {chapter_info['chapter']} ({elapsed:.1f}s)")
+
+            # P0 v5: 빌드 검증 챕터는 하네스가 직접 실행 (LLM 토큰 절약)
+            is_build_chapter = any(
+                kw in chapter_info["chapter"].lower()
+                for kw in ("빌드 검증", "build verification", "빌드검증")
+            )
+            if is_build_chapter:
+                output = self.execute_build_verification()
             else:
-                print(f"⚠️ [Chapter {c_num}] 실행 중 오류 발생. 중단합니다.")
-                break
+                output = self.execute_chapter(c_num, chapter_info)
 
-        print("\n🏁 하네스 실행 완료")
-
-
-if __name__ == "__main__":
-    harness = SmartOrchestrator()
-    harness.run()
-료")
-
-
-if __name__ == "__main__":
-    harness = SmartOrchestrator()
-    harness.run()
-�� 실행 시작")
-
-        for c_num, chapter_info in sorted(pending, key=lambda x: x[0]):
-            start = time.time()
-            output = self.execute_chapter(c_num, chapter_info)
             elapsed = time.time() - start
             if output:
                 self.update_status(c_num)

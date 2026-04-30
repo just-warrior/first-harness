@@ -24,6 +24,7 @@ https://developer.atlassian.com/server/jira/platform/p2-plugin-architecture/
 수정 사항이 이전과 동일할 경우, 작업 중단 후 사용자에게 환경 변수(Environment) 확인을 요청할 것.
 모든 수정 결과는 '이유-방법-기대효과'의 3단계로 요약하여 기록할 것.
 수정 후 다시 빌드할땐 기존 버전에서 0.0.1 을 더할 것.
+harness.py 에서 플러그인 빌드를 하는경우가 아니라면 atlas-* 명령어로 빌드하지 말고 코드 수정만 할것.
 
 ## Test Protocol
 atlas 빌드가 성공하면 성공한걸로 테스트를 종료할 것.

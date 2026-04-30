@@ -3,7 +3,18 @@
     "allow": [
       "Bash(atlas-mvn clean *)",
       "Bash(jar tf *)",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(atlas-mvn package *)",
+      "Bash(atlas-mvn dependency:tree -q)",
+      "Bash(unzip -p /Users/jeongminchae/Desktop/Develop/jira-calculator-plugin/workspace_v1/jira-calculator-plugin/target/jira-calculator-plugin-1.0.1.jar META-INF/MANIFEST.MF)",
+      "Bash(unzip -l /Users/jeongminchae/Desktop/Develop/jira-calculator-plugin/workspace_v1/jira-calculator-plugin/target/jira-calculator-plugin-1.0.1.jar)",
+      "Read(//private/tmp/**)",
+      "Bash(jar -tf /Users/jeongminchae/Desktop/Develop/jira-calculator-plugin/workspace/jira-calculator-plugin/target/jira-calculator-plugin-1.0.1.jar)",
+      "Bash(grep -v \"/$\")",
+      "Bash(jar -xf /Users/jeongminchae/Desktop/Develop/jira-calculator-plugin/workspace/jira-calculator-plugin/target/jira-calculator-plugin-1.0.1.jar META-INF/MANIFEST.MF)",
+      "Bash(jar -tf /Users/jeongminchae/Desktop/Develop/jira-calculator-plugin/workspace/jira-calculator-plugin/target/jira-calculator-plugin-1.0.2.jar)",
+      "Bash(jar -xf /Users/jeongminchae/Desktop/Develop/jira-calculator-plugin/workspace/jira-calculator-plugin/target/jira-calculator-plugin-1.0.2.jar META-INF/MANIFEST.MF)",
+      "Bash(jar -xf /Users/jeongminchae/Desktop/Develop/jira-calculator-plugin/workspace/jira-calculator-plugin/target/jira-calculator-plugin-1.0.2.jar META-INF/plugin-components/component)"
     ]
   }
 }

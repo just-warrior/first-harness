@@ -1,43 +1,36 @@
-$webResourceManager.requireResource("com.example.jira-calculator-plugin:calculator-resources")
 <html>
 <head>
-    <title>$i18n.getText("calculator.error.title")</title>
+    <title>Calculator Error</title>
     <meta name="decorator" content="atl.admin"/>
     <meta name="admin.active.section" content="admin_plugins_menu/calculator-section"/>
 </head>
 <body>
 
 <section id="content" role="main">
-
     <header class="aui-page-header">
         <div class="aui-page-header-inner">
             <div class="aui-page-header-main">
-                <h2>$i18n.getText("calculator.error.title")</h2>
+                <h1>Calculator Error</h1>
             </div>
         </div>
     </header>
 
     <div class="aui-page-panel">
         <div class="aui-page-panel-inner">
-            <div class="aui-page-panel-content">
+            <section class="aui-page-panel-content">
 
                 <div class="aui-message aui-message-error">
-                    <p class="title">
-                        <strong>$i18n.getText("calculator.error.title")</strong>
-                    </p>
-                    <p>$i18n.getText("calculator.error.message")</p>
+                    <p class="title"><strong>Error</strong></p>
+                    <p>An error occurred while loading the calculator. Please try again.</p>
                 </div>
 
                 <p style="margin-top: 16px;">
-                    <a href="/secure/CalculatorAction!default.jspa" class="aui-button">
-                        Return to Calculator
-                    </a>
+                    <a href="/secure/CalculatorAction!default.jspa">Return to Calculator</a>
                 </p>
 
-            </div>
+            </section>
         </div>
     </div>
-
 </section>
 
 </body>

@@ -12,7 +12,11 @@
   - **JAX-RS REST API** (`@Path`, `@POST`, `@GET` 등): `javax.ws.rs.*` 사용 ✅
   - **DI 어노테이션**: REST 리소스에 `@Named` 사용 금지 ❌ — `jakarta.inject`도 OSGi 미충족. `<rest>` 모듈 디스크립터가 패키지 스캔으로 직접 등록하므로 불필요.
   - **결론**: 이 Jira 10.3.4 인스턴스는 `jakarta.*` 패키지를 전혀 export하지 않음 (`jakarta.ws.rs`, `jakarta.inject` 모두 확인)
-- **Rules**: `plugin-context.xml` 내의 스캐닝 태그 사용 금지. 전적으로 Java Annotation 방식을 따름.
+- **Rules**: Spring Scanner 3.x 사용 시 두 가지가 모두 필요하다:
+  1. `@Named` (또는 `@Component`) 어노테이션 → `META-INF/plugin-components/component` 인덱스 생성
+  2. `META-INF/spring/plugin-context.xml` + `<atlassian-scanner:scan-indexes/>` → 인덱스를 읽어 Spring 컨테이너 초기화
+  - 인덱스만 있고 `plugin-context.xml`이 없으면 컨테이너가 생성되지 않아 "Plugin has no container" 예외 발생 (PITFALL-06 참조)
+  - `<context:component-scan>` 같은 클래스패스 스캐닝 태그는 사용 금지. `<atlassian-scanner:scan-indexes/>`만 허용.
 
 ## 🎨 Skill 3: Web-UI & Integration (Standard)
 - **Webwork Action (Java)**:
@@ -237,7 +241,8 @@ OSGi는 직접 import한 패키지뿐 아니라 **클래스 계층에서 간접 
 
 ## 🏢 Skill 7: Modern Injection Rules
 - **Standard**: 모든 비즈니스 로직(Service/Component)은 `@Named`와 생성자 주입(`@Inject`)을 사용하십시오.
-- **Exception**: `JiraWebActionSupport`를 상속받는 Webwork Action 클래스는 Jira 프레임워크가 인스턴스화하므로, 내부 로직에서 필요 시 `ComponentAccessor`를 사용하여 의존성을 획득하십시오.
+- **WebWork Action `@Component` 필수 (PITFALL-06 참조)**: `atlassian-spring-scanner-maven-plugin`이 pom.xml에 있으면 `MANIFEST.MF`에 `Spring-Scanner-Version`이 삽입되어, Jira의 `JiraPluginActionFactory`가 Spring 컨테이너를 통해 액션을 생성한다. 따라서 **생성자 주입 없이도** `@Component`를 반드시 선언해야 컨테이너가 초기화된다.
+- **Exception**: `JiraWebActionSupport` 액션에서 Jira 서비스가 필요하면 생성자 주입 대신 `ComponentAccessor`를 사용하십시오 (Spring이 액션을 singleton으로 관리하므로 인스턴스 필드에 상태를 두지 말 것).
 
 ## 🛑 Skill 8: Jira 10 Strict Compatibility
 - **Library Bans**: Google Guava(`com.google.common.*`)와 Joda-time(`org.joda.time.*`) 사용을 엄격히 금지합니다.
@@ -304,3 +309,53 @@ AUI의 `.aui-button` 클래스는 `display: inline-flex`, 고정 padding, border
 - [ ] CSS Grid 컨테이너 내부 버튼에 `aui-button` 또는 `aui-button-primary` 클래스가 없는가?
 - [ ] `.calc-grid`에 `display: grid !important`가 선언되어 있는가?
 - [ ] `.calc-grid .calc-btn`에 `width: 100% !important`, `margin: 0 !important`가 선언되어 있는가?
+
+---
+
+### [PITFALL-06] Spring Scanner 활성화 상태에서 WebWork Action에 `@Component` 누락
+
+**증상:** 플러그인 설치 후 액션 URL 접근 시 아래 예외 발생.
+```
+java.lang.UnsupportedOperationException: Plugin 'com.example.jira-calculator-plugin' has no container
+    at com.atlassian.plugin.osgi.util.OsgiPluginUtil$1.createBean(OsgiPluginUtil.java:42)
+    at com.atlassian.jira.config.webwork.JiraPluginActionFactory.getActionImpl(...)
+```
+
+**원인:**
+`pom.xml`에 `atlassian-spring-scanner-maven-plugin`이 있으면 빌드 시 `MANIFEST.MF`에 `Spring-Scanner-Version: 3.0.0`이 자동 삽입된다.
+이 헤더를 감지한 Jira의 `JiraPluginActionFactory`는 webwork1 액션을 플러그인의 **OSGi Spring 컨테이너**를 통해 생성한다.
+`@Component`(또는 `@Named`) 어노테이션이 없으면 Spring bean이 0개 → 컨테이너 자체가 초기화되지 않음 → "no container" 예외.
+
+| 상태 | 결과 |
+|---|---|
+| `Spring-Scanner-Version` 있음 + `@Component` 없음 | ❌ "Plugin has no container" |
+| `Spring-Scanner-Version` 있음 + `@Component` 있음 | ✅ 정상 동작 |
+
+**올바른 패턴:**
+
+```java
+import org.springframework.stereotype.Component;
+import com.atlassian.jira.web.action.JiraWebActionSupport;
+
+// 생성자 주입이 없어도 @Component 필수 (컨테이너 초기화 트리거)
+@Component
+@SupportedMethods({RequestMethod.GET, RequestMethod.POST})
+public class CalculatorAction extends JiraWebActionSupport {
+    // Jira 서비스 접근 시 ComponentAccessor 사용 (생성자 주입 금지)
+}
+```
+
+```xml
+<!-- pom.xml: spring-context compile-time 의존성 필요 -->
+<dependency>
+    <groupId>org.springframework</groupId>
+    <artifactId>spring-context</artifactId>
+    <version>5.3.29</version>
+    <scope>provided</scope>
+</dependency>
+```
+
+**체크리스트:**
+- [ ] `pom.xml`에 `atlassian-spring-scanner-maven-plugin`이 있다면, 모든 webwork1 액션 클래스에 `@Component`가 선언되어 있는가?
+- [ ] `pom.xml`에 `spring-context`(provided)가 추가되어 있는가?
+- [ ] `@Component`가 있는 클래스에 인스턴스 필드(상태)가 없는가? (singleton 안전 확인)
