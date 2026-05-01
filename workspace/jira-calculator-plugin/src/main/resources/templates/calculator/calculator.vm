@@ -1,80 +1,63 @@
 <html>
 <head>
-    <title>Admin Calculator</title>
     <meta name="decorator" content="atl.admin"/>
     <meta name="admin.active.section" content="admin_plugins_menu/calculator-section"/>
+    <title>Calculator</title>
     $webResourceManager.requireResource("com.example.jira-calculator-plugin:calculator-resources")
 </head>
 <body>
-
 <section id="content" role="main">
     <header class="aui-page-header">
         <div class="aui-page-header-inner">
             <div class="aui-page-header-main">
-                <h1>Admin Calculator</h1>
+                <h1>Calculator</h1>
             </div>
         </div>
     </header>
-
     <div class="aui-page-panel">
         <div class="aui-page-panel-inner">
             <section class="aui-page-panel-content">
 
-                <div class="calc-container">
-                    <!-- Display -->
-                    <div class="calc-display">
-                        <div class="calc-expression" id="calc-expression">&nbsp;</div>
-                        <div id="calc-current">0</div>
-                    </div>
-
-                    <!--
-                        PITFALL-05: aui-button 클래스 사용 금지 — calc-btn 계열 커스텀 클래스만 사용
-                        Skill 11: onclick 인라인 핸들러 금지 — data-action/data-value 속성으로 JS에서 위임 처리
-                    -->
+                <div id="calculator-wrapper">
+                    <div class="calc-display" id="calc-display">0</div>
                     <div class="calc-grid">
-                        <!-- Row 1 -->
-                        <button class="calc-btn calc-btn-clear" data-action="clear">C</button>
-                        <button class="calc-btn calc-btn-clear" data-action="sign">+/-</button>
-                        <button class="calc-btn calc-btn-clear" data-action="percent">%</button>
-                        <button class="calc-btn calc-btn-operator" data-action="operator" data-value="/">&divide;</button>
+                        <!-- Row 1: C (span 3), / -->
+                        <button class="calc-btn calc-btn-action calc-btn-clear" data-action="clear">C</button>
+                        <button class="calc-btn calc-btn-operator" data-action="operator" data-value="/">/</button>
 
-                        <!-- Row 2 -->
+                        <!-- Row 2: 7, 8, 9, * -->
                         <button class="calc-btn calc-btn-number" data-action="number" data-value="7">7</button>
                         <button class="calc-btn calc-btn-number" data-action="number" data-value="8">8</button>
                         <button class="calc-btn calc-btn-number" data-action="number" data-value="9">9</button>
-                        <button class="calc-btn calc-btn-operator" data-action="operator" data-value="*">&times;</button>
+                        <button class="calc-btn calc-btn-operator" data-action="operator" data-value="*">*</button>
 
-                        <!-- Row 3 -->
+                        <!-- Row 3: 4, 5, 6, - -->
                         <button class="calc-btn calc-btn-number" data-action="number" data-value="4">4</button>
                         <button class="calc-btn calc-btn-number" data-action="number" data-value="5">5</button>
                         <button class="calc-btn calc-btn-number" data-action="number" data-value="6">6</button>
-                        <button class="calc-btn calc-btn-operator" data-action="operator" data-value="-">&minus;</button>
+                        <button class="calc-btn calc-btn-operator" data-action="operator" data-value="-">-</button>
 
-                        <!-- Row 4 -->
+                        <!-- Row 4: 1, 2, 3, + -->
                         <button class="calc-btn calc-btn-number" data-action="number" data-value="1">1</button>
                         <button class="calc-btn calc-btn-number" data-action="number" data-value="2">2</button>
                         <button class="calc-btn calc-btn-number" data-action="number" data-value="3">3</button>
                         <button class="calc-btn calc-btn-operator" data-action="operator" data-value="+">+</button>
 
-                        <!-- Row 5 -->
-                        <button class="calc-btn calc-btn-number calc-btn-wide" data-action="number" data-value="0">0</button>
+                        <!-- Row 5: 0 (span 2), ., = -->
+                        <button class="calc-btn calc-btn-number calc-btn-zero" data-action="number" data-value="0">0</button>
                         <button class="calc-btn calc-btn-number" data-action="decimal">.</button>
                         <button class="calc-btn calc-btn-equals" data-action="equals">=</button>
                     </div>
                 </div>
 
-                <!-- History Panel -->
-                <div class="calc-history">
-                    <h3>Calculation History</h3>
-                    <ul id="calc-history-list">
-                        <li class="history-empty">No calculations yet</li>
-                    </ul>
+                <div id="calc-history" class="calc-history">
+                    <h3>History</h3>
+                    <ul id="calc-history-list"></ul>
                 </div>
 
             </section>
         </div>
     </div>
 </section>
-
 </body>
 </html>

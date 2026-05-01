@@ -1,130 +1,130 @@
-/* ===== Calculator Container ===== */
-.calc-container {
-    max-width: 320px;
-    margin: 20px 0;
-}
-
-/* ===== Display ===== */
-.calc-display {
-    background: #1e1e1e;
-    color: #fff;
+/* Calculator wrapper */
+#calculator-wrapper {
+    display: inline-block;
+    width: 280px;
+    background: #1c1c1c;
+    border-radius: 8px;
     padding: 16px;
-    font-size: 24px;
-    text-align: right;
-    border-radius: 4px 4px 0 0;
-    min-height: 70px;
-    overflow: hidden;
-    word-break: break-all;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    vertical-align: top;
 }
 
-.calc-display .calc-expression {
-    font-size: 13px;
-    color: #aaa;
-    min-height: 18px;
-    margin-bottom: 4px;
+/* Display panel */
+.calc-display {
+    background: #2a2a2a !important;
+    color: #ffffff !important;
+    font-size: 28px !important;
+    font-weight: 300 !important;
+    text-align: right !important;
+    padding: 12px 16px !important;
+    margin-bottom: 12px !important;
+    border-radius: 4px !important;
+    min-height: 52px !important;
+    overflow: hidden !important;
+    word-break: break-all !important;
+    line-height: 1.2 !important;
 }
 
-/* ===== Grid Layout — PITFALL-05: !important to override AUI ===== */
+/* CSS Grid button layout — PITFALL-05: !important required to override AUI */
 .calc-grid {
     display: grid !important;
     grid-template-columns: repeat(4, 1fr) !important;
-    gap: 2px !important;
-    background: #d4d4d2;
-    border: 1px solid #d4d4d2;
+    gap: 8px !important;
 }
 
+/* C button spans 3 columns */
+.calc-grid .calc-btn-clear {
+    grid-column: span 3 !important;
+}
+
+/* 0 button spans 2 columns */
+.calc-grid .calc-btn-zero {
+    grid-column: span 2 !important;
+}
+
+/* Base button style — no aui-button class used (PITFALL-05) */
 .calc-grid .calc-btn {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     width: 100% !important;
-    height: 60px !important;
     margin: 0 !important;
     border: none !important;
+    border-radius: 4px !important;
     font-size: 18px !important;
+    font-weight: 400 !important;
+    height: 52px !important;
     cursor: pointer !important;
-    background: #f5f5f5 !important;
-    color: #333 !important;
+    transition: filter 0.1s ease !important;
     box-sizing: border-box !important;
-    border-radius: 0 !important;
-    transition: background 0.1s !important;
+    padding: 0 !important;
+    outline: none !important;
 }
 
 .calc-grid .calc-btn:hover {
-    background: #e0e0e0 !important;
+    filter: brightness(1.2) !important;
 }
 
 .calc-grid .calc-btn:active {
-    background: #c8c8c8 !important;
+    filter: brightness(0.85) !important;
 }
 
+/* Number buttons */
+.calc-grid .calc-btn-number {
+    background-color: #3a3a3a !important;
+    color: #ffffff !important;
+}
+
+/* Operator buttons (+, -, *, /) */
 .calc-grid .calc-btn-operator {
-    background: #ff9f0a !important;
-    color: #fff !important;
+    background-color: #ff9500 !important;
+    color: #ffffff !important;
 }
 
-.calc-grid .calc-btn-operator:hover {
-    background: #ffb340 !important;
+/* Clear button */
+.calc-grid .calc-btn-action {
+    background-color: #a5a5a5 !important;
+    color: #1c1c1c !important;
 }
 
+/* Equals button */
 .calc-grid .calc-btn-equals {
-    background: #ff9f0a !important;
-    color: #fff !important;
+    background-color: #ff9500 !important;
+    color: #ffffff !important;
 }
 
-.calc-grid .calc-btn-equals:hover {
-    background: #ffb340 !important;
-}
-
-.calc-grid .calc-btn-clear {
-    background: #a5a5a5 !important;
-    color: #333 !important;
-}
-
-.calc-grid .calc-btn-clear:hover {
-    background: #bdbdbd !important;
-}
-
-.calc-grid .calc-btn-wide {
-    grid-column: span 2 !important;
-}
-
-/* ===== History Panel ===== */
+/* History panel */
 .calc-history {
-    margin-top: 24px;
-    max-width: 320px;
+    display: inline-block;
+    vertical-align: top;
+    margin-left: 24px;
+    min-width: 220px;
 }
 
 .calc-history h3 {
     font-size: 14px;
-    font-weight: bold;
-    margin-bottom: 8px;
     color: #333;
+    margin-bottom: 8px;
 }
 
-.calc-history ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    background: #fafafa;
+#calc-history-list {
+    list-style: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
-.calc-history ul li {
-    padding: 8px 12px;
+#calc-history-list li {
+    padding: 6px 10px;
+    border-left: 3px solid #ff9500;
+    margin-bottom: 6px;
+    background: #f5f5f5;
     font-size: 13px;
-    color: #555;
-    border-bottom: 1px solid #eee;
+    color: #333;
+    border-radius: 0 4px 4px 0;
 }
 
-.calc-history ul li:last-child {
-    border-bottom: none;
-}
-
-.calc-history .history-empty {
-    padding: 8px 12px;
-    font-size: 13px;
-    color: #999;
-    font-style: italic;
+/* Error state display */
+.calc-display.calc-display-error {
+    color: #ff5c5c !important;
+    font-size: 18px !important;
 }

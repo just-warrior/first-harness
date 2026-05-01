@@ -7,7 +7,7 @@
 
     <groupId>com.example</groupId>
     <artifactId>jira-calculator-plugin</artifactId>
-    <version>1.0.4</version>
+    <version>1.0.3</version>
     <packaging>atlassian-plugin</packaging>
 
     <name>Jira Admin Calculator Plugin</name>
@@ -32,14 +32,6 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- JSR-330 -->
-        <dependency>
-            <groupId>javax.inject</groupId>
-            <artifactId>javax.inject</artifactId>
-            <version>1</version>
-            <scope>provided</scope>
-        </dependency>
-
         <!-- JAX-RS 2.x (javax, not jakarta) — PITFALL-03 준수 -->
         <dependency>
             <groupId>javax.ws.rs</groupId>
@@ -56,19 +48,19 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Spring Context — PITFALL-06: @Component 사용을 위해 필요 -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <version>5.3.29</version>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Spring Scanner -->
         <dependency>
             <groupId>com.atlassian.plugin</groupId>
             <artifactId>atlassian-spring-scanner-annotation</artifactId>
             <version>${spring.scanner.version}</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- JSON (Jackson) -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.13.4</version>
             <scope>provided</scope>
         </dependency>
 
@@ -101,6 +93,7 @@
                             javax.ws.rs,
                             javax.ws.rs.core,
                             javax.ws.rs.ext,
+                            org.springframework.stereotype,
                             org.slf4j,
                             *
                         </Import-Package>

@@ -1,37 +1,29 @@
 <html>
 <head>
-    <title>Calculator Error</title>
     <meta name="decorator" content="atl.admin"/>
     <meta name="admin.active.section" content="admin_plugins_menu/calculator-section"/>
+    <title>Calculator - Error</title>
 </head>
 <body>
-
 <section id="content" role="main">
     <header class="aui-page-header">
         <div class="aui-page-header-inner">
             <div class="aui-page-header-main">
-                <h1>Calculator Error</h1>
+                <h1>Calculator - Error</h1>
             </div>
         </div>
     </header>
-
     <div class="aui-page-panel">
         <div class="aui-page-panel-inner">
             <section class="aui-page-panel-content">
-
                 <div class="aui-message aui-message-error">
-                    <p class="title"><strong>Error</strong></p>
-                    <p>An error occurred while loading the calculator. Please try again.</p>
+                    <p class="title"><strong>An error occurred</strong></p>
+                    <p>Unable to load the Calculator. Please try again or contact your administrator.</p>
+                    <p><a href="/secure/CalculatorAction!default.jspa">Return to Calculator</a></p>
                 </div>
-
-                <p style="margin-top: 16px;">
-                    <a href="/secure/CalculatorAction!default.jspa">Return to Calculator</a>
-                </p>
-
             </section>
         </div>
     </div>
 </section>
-
 </body>
 </html>

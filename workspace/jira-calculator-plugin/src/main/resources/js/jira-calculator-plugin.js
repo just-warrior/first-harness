@@ -3,36 +3,43 @@
 
     var state = {
         currentInput: '0',
-        operand1: null,
+        prevInput: null,
         operator: null,
-        waitingForSecond: false,
-        expression: ''
+        waitingForSecond: false
     };
 
     var history = [];
+    var MAX_HISTORY = 5;
 
-    function updateDisplay() {
-        AJS.$('#calc-current').text(state.currentInput);
-        AJS.$('#calc-expression').text(state.expression || ' ');
+    function updateDisplay(value) {
+        var $display = AJS.$('#calc-display');
+        $display.text(value);
+        $display.removeClass('calc-display-error');
     }
 
-    function formatNumber(num) {
-        var str = String(num);
-        if (str.indexOf('.') !== -1) {
-            str = str.replace(/\.?0+$/, '');
-        }
-        return str || '0';
+    function showError(msg) {
+        var $display = AJS.$('#calc-display');
+        $display.text(msg);
+        $display.addClass('calc-display-error');
     }
 
-    function appendHistory(entry) {
-        history.unshift(entry);
-        if (history.length > 5) {
+    function resetState() {
+        state.currentInput = '0';
+        state.prevInput = null;
+        state.operator = null;
+        state.waitingForSecond = false;
+        updateDisplay('0');
+    }
+
+    function addHistory(expression) {
+        history.unshift(expression);
+        if (history.length > MAX_HISTORY) {
             history.pop();
         }
         var $list = AJS.$('#calc-history-list');
         $list.empty();
-        AJS.$.each(history, function (i, item) {
-            $list.append('<li>' + item + '</li>');
+        AJS.$.each(history, function (i, expr) {
+            $list.append(AJS.$('<li>').text(expr));
         });
     }
 
@@ -41,114 +48,100 @@
             state.currentInput = value;
             state.waitingForSecond = false;
         } else {
-            state.currentInput = state.currentInput === '0' ? value : state.currentInput + value;
+            state.currentInput = state.currentInput === '0'
+                ? value
+                : state.currentInput + value;
         }
-        updateDisplay();
-    }
-
-    function handleOperator(value) {
-        state.operand1 = state.currentInput;
-        state.operator = value;
-        state.expression = state.currentInput + ' ' + value;
-        state.waitingForSecond = true;
-        updateDisplay();
-    }
-
-    function handleClear() {
-        state.currentInput = '0';
-        state.operand1 = null;
-        state.operator = null;
-        state.waitingForSecond = false;
-        state.expression = '';
-        updateDisplay();
+        updateDisplay(state.currentInput);
     }
 
     function handleDecimal() {
         if (state.waitingForSecond) {
             state.currentInput = '0.';
             state.waitingForSecond = false;
-        } else if (state.currentInput.indexOf('.') === -1) {
+            updateDisplay(state.currentInput);
+            return;
+        }
+        if (state.currentInput.indexOf('.') === -1) {
             state.currentInput += '.';
-        }
-        updateDisplay();
-    }
-
-    function handleSign() {
-        if (state.currentInput !== '0') {
-            state.currentInput = state.currentInput.charAt(0) === '-'
-                ? state.currentInput.slice(1)
-                : '-' + state.currentInput;
-            updateDisplay();
+            updateDisplay(state.currentInput);
         }
     }
 
-    function handlePercent() {
-        var val = parseFloat(state.currentInput);
-        if (!isNaN(val)) {
-            state.currentInput = formatNumber(val / 100);
-            updateDisplay();
-        }
+    function handleOperator(op) {
+        state.prevInput = state.currentInput;
+        state.operator = op;
+        state.waitingForSecond = true;
+        updateDisplay(state.currentInput + ' ' + op);
     }
 
     function handleEquals() {
-        if (state.operand1 === null || state.operator === null) {
+        if (state.prevInput === null || state.operator === null) {
             return;
         }
 
+        var operand1 = state.prevInput;
         var operand2 = state.currentInput;
-        var expression = state.operand1 + ' ' + state.operator + ' ' + operand2;
+        var operator = state.operator;
 
         AJS.$.ajax({
             url: AJS.contextPath() + '/rest/calculator/1.0/calculate',
             type: 'POST',
             contentType: 'application/json',
+            dataType: 'json',
             data: JSON.stringify({
-                operand1: state.operand1,
-                operator: state.operator,
+                operand1: operand1,
+                operator: operator,
                 operand2: operand2
             }),
-            success: function (response) {
-                if (response.error) {
-                    state.currentInput = 'Error';
-                    state.expression = response.error;
-                } else {
-                    var resultStr = formatNumber(response.result);
-                    appendHistory(expression + ' = ' + resultStr);
-                    state.currentInput = resultStr;
-                    state.expression = expression + ' =';
-                }
-                state.operand1 = null;
+            success: function (data) {
+                var resultStr = String(data.result);
+                updateDisplay(resultStr);
+                addHistory(data.expression);
+                state.currentInput = resultStr;
+                state.prevInput = null;
                 state.operator = null;
                 state.waitingForSecond = false;
-                updateDisplay();
             },
-            error: function () {
-                state.currentInput = 'Error';
-                state.expression = 'Request failed';
-                state.operand1 = null;
+            error: function (xhr) {
+                var msg = 'Error';
+                try {
+                    var body = JSON.parse(xhr.responseText);
+                    if (body && body.error) {
+                        msg = body.error;
+                    }
+                } catch (e) { /* ignore */ }
+                showError(msg);
+                state.prevInput = null;
                 state.operator = null;
+                state.currentInput = '0';
                 state.waitingForSecond = false;
-                updateDisplay();
             }
         });
     }
 
-    AJS.$(document).ready(function () {
-        updateDisplay();
-
-        AJS.$('.calc-grid').on('click', '.calc-btn', function () {
+    AJS.$(function () {
+        AJS.$('.calc-grid').on('click', '.calc-btn', function (e) {
             var $btn = AJS.$(this);
             var action = $btn.data('action');
             var value = $btn.data('value');
 
             switch (action) {
-                case 'number':   handleNumber(String(value)); break;
-                case 'operator': handleOperator(value); break;
-                case 'clear':    handleClear(); break;
-                case 'decimal':  handleDecimal(); break;
-                case 'sign':     handleSign(); break;
-                case 'percent':  handlePercent(); break;
-                case 'equals':   handleEquals(); break;
+                case 'number':
+                    handleNumber(String(value));
+                    break;
+                case 'operator':
+                    handleOperator(String(value));
+                    break;
+                case 'decimal':
+                    handleDecimal();
+                    break;
+                case 'equals':
+                    handleEquals();
+                    break;
+                case 'clear':
+                    resetState();
+                    break;
             }
         });
     });

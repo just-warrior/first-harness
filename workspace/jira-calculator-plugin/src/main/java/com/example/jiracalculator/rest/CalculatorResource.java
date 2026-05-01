@@ -7,58 +7,81 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-// PITFALL-03: javax.ws.rs (not jakarta.ws.rs)
-// Skill 2: No @Named annotation on REST resource
 @Path("/calculate")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
 public class CalculatorResource {
 
     @POST
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response calculate(CalculationRequest request) {
-        if (request == null || request.getOperand1() == null || request.getOperand2() == null || request.getOperator() == null) {
-            return Response.ok(new CalculationResponse(null, "Missing required fields")).build();
+    public Response calculate(CalculateRequest request) {
+        if (request == null
+                || request.getOperand1() == null
+                || request.getOperand2() == null
+                || request.getOperator() == null) {
+            return Response.status(400)
+                    .entity("{\"error\":\"operand1, operand2, operator are required\"}")
+                    .build();
         }
 
+        double operand1;
+        double operand2;
         try {
-            double a = Double.parseDouble(request.getOperand1().trim());
-            double b = Double.parseDouble(request.getOperand2().trim());
-            double result;
-
-            switch (request.getOperator()) {
-                case "+":
-                    result = a + b;
-                    break;
-                case "-":
-                    result = a - b;
-                    break;
-                case "*":
-                    result = a * b;
-                    break;
-                case "/":
-                    if (b == 0) {
-                        return Response.ok(new CalculationResponse(null, "Cannot divide by zero")).build();
-                    }
-                    result = a / b;
-                    break;
-                default:
-                    return Response.ok(new CalculationResponse(null, "Invalid operator: " + request.getOperator())).build();
-            }
-
-            return Response.ok(new CalculationResponse(result, null)).build();
-
+            operand1 = Double.parseDouble(request.getOperand1());
+            operand2 = Double.parseDouble(request.getOperand2());
         } catch (NumberFormatException e) {
-            return Response.ok(new CalculationResponse(null, "Invalid number format")).build();
+            return Response.status(400)
+                    .entity("{\"error\":\"Invalid number format\"}")
+                    .build();
         }
+
+        String operator = request.getOperator().trim();
+        double result;
+
+        switch (operator) {
+            case "+":
+                result = operand1 + operand2;
+                break;
+            case "-":
+                result = operand1 - operand2;
+                break;
+            case "*":
+                result = operand1 * operand2;
+                break;
+            case "/":
+                if (operand2 == 0) {
+                    return Response.status(400)
+                            .entity("{\"error\":\"Division by zero\"}")
+                            .build();
+                }
+                result = operand1 / operand2;
+                if (Double.isInfinite(result) || Double.isNaN(result)) {
+                    return Response.status(400)
+                            .entity("{\"error\":\"Division by zero\"}")
+                            .build();
+                }
+                break;
+            default:
+                return Response.status(400)
+                        .entity("{\"error\":\"Unsupported operator: " + operator + "\"}")
+                        .build();
+        }
+
+        String expression = request.getOperand1() + " " + operator + " " + request.getOperand2() + " = " + formatResult(result);
+        String json = "{\"result\":" + result + ",\"expression\":\"" + expression + "\"}";
+        return Response.ok(json).build();
     }
 
-    // Jackson requires default constructor + getter/setter for deserialization
-    public static class CalculationRequest {
+    private String formatResult(double value) {
+        if (value == Math.floor(value) && !Double.isInfinite(value)) {
+            return String.valueOf((long) value);
+        }
+        return String.valueOf(value);
+    }
+
+    public static class CalculateRequest {
         private String operand1;
         private String operator;
         private String operand2;
-
-        public CalculationRequest() {}
 
         public String getOperand1() { return operand1; }
         public void setOperand1(String operand1) { this.operand1 = operand1; }
@@ -68,24 +91,5 @@ public class CalculatorResource {
 
         public String getOperand2() { return operand2; }
         public void setOperand2(String operand2) { this.operand2 = operand2; }
-    }
-
-    // Jackson requires default constructor for serialization in some contexts
-    public static class CalculationResponse {
-        private Double result;
-        private String error;
-
-        public CalculationResponse() {}
-
-        public CalculationResponse(Double result, String error) {
-            this.result = result;
-            this.error = error;
-        }
-
-        public Double getResult() { return result; }
-        public void setResult(Double result) { this.result = result; }
-
-        public String getError() { return error; }
-        public void setError(String error) { this.error = error; }
     }
 }

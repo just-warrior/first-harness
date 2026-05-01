@@ -14,7 +14,13 @@
       "Bash(jar -xf /Users/jeongminchae/Desktop/Develop/jira-calculator-plugin/workspace/jira-calculator-plugin/target/jira-calculator-plugin-1.0.1.jar META-INF/MANIFEST.MF)",
       "Bash(jar -tf /Users/jeongminchae/Desktop/Develop/jira-calculator-plugin/workspace/jira-calculator-plugin/target/jira-calculator-plugin-1.0.2.jar)",
       "Bash(jar -xf /Users/jeongminchae/Desktop/Develop/jira-calculator-plugin/workspace/jira-calculator-plugin/target/jira-calculator-plugin-1.0.2.jar META-INF/MANIFEST.MF)",
-      "Bash(jar -xf /Users/jeongminchae/Desktop/Develop/jira-calculator-plugin/workspace/jira-calculator-plugin/target/jira-calculator-plugin-1.0.2.jar META-INF/plugin-components/component)"
+      "Bash(jar -xf /Users/jeongminchae/Desktop/Develop/jira-calculator-plugin/workspace/jira-calculator-plugin/target/jira-calculator-plugin-1.0.2.jar META-INF/plugin-components/component)",
+      "Bash(jar -tf /Users/jeongminchae/.m2/repository/com/atlassian/jira/jira-api/10.3.4/jira-api-10.3.4.jar)",
+      "Bash(jar -tf /Users/jeongminchae/.m2/repository/com/atlassian/jira/jira-api/10.1.1/jira-api-10.1.1.jar)",
+      "Bash(jar -tf /Users/jeongminchae/.m2/repository/com/atlassian/jira/jira-api/10.3.1/jira-api-10.3.1.jar)",
+      "Bash(jar -tf /Users/jeongminchae/.m2/repository/com/atlassian/jira/jira-api/11.0.1/jira-api-11.0.1.jar)",
+      "Bash(git -C /Users/jeongminchae/Desktop/Develop/jira-calculator-plugin show HEAD:workspace/jira-calculator-plugin/src/main/resources/META-INF/spring/plugin-context.xml)",
+      "Bash(git -C /Users/jeongminchae/Desktop/Develop/jira-calculator-plugin log --oneline --diff-filter=D -- \"*/META-INF/spring/plugin-context.xml\")"
     ]
   }
 }

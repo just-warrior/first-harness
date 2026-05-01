@@ -29,6 +29,10 @@ class SmartOrchestrator:
         (".java", "import jakarta.", "jakarta.* 패키지 사용 금지 (Skill 8, PITFALL-03)"),
         (".xml", 'version="*"', 'Import-Package version="*" 사용 금지 (PITFALL-02)'),
         (".vm", "onclick=", "인라인 onclick 핸들러 사용 금지 (Skill 11)"),
+        (".java", "import com.atlassian.jira.web.action.SupportedMethods",
+         "SupportedMethods 패키지 오류 — com.atlassian.jira.security.request.SupportedMethods 사용 (PITFALL-07)"),
+        (".java", "import com.atlassian.jira.web.action.RequestMethod",
+         "RequestMethod 패키지 오류 — com.atlassian.jira.security.request.RequestMethod 사용 (PITFALL-07)"),
     ]
 
     def __init__(self):
@@ -469,11 +473,15 @@ JSON 배열만 출력하세요:"""
                 if ext == rule_ext and pattern in content:
                     violations.append(f"{rel_path}: {desc}")
 
-            # Action 전용: @Named + JiraWebActionSupport 조합 금지 (Skill 7)
+            # Action 전용: JiraWebActionSupport 상속 클래스에 @Component/@Named 조합 금지 (PITFALL-08)
             if ext == ".java":
-                if "extends JiraWebActionSupport" in content and "@Named" in content:
+                if "extends JiraWebActionSupport" in content and (
+                    "@Component" in content or "@Named" in content
+                ):
                     violations.append(
-                        f"{rel_path}: Action 클래스에 @Named 사용 금지 — Jira가 직접 인스턴스화 (Skill 7)"
+                        f"{rel_path}: JiraWebActionSupport 상속 클래스에 @Component/@Named 금지 "
+                        f"— ConfigurationClassParser OSGi 클래스 로딩 실패 유발 (PITFALL-08). "
+                        f"plugin-context.xml에 <bean> 직접 선언 사용"
                     )
 
             # pom.xml 전용: version="*" in Import-Package (PITFALL-02)
@@ -611,6 +619,17 @@ JSON 배열만 출력하세요:"""
 
         if not build_dir:
             print("❌ [Build] pom.xml이 있는 프로젝트 디렉터리를 찾을 수 없습니다.")
+            return None
+
+        # plugin-context.xml 존재 여부 확인 — 없으면 "Plugin has no container" 런타임 오류 발생 (PITFALL-06)
+        plugin_context_found = False
+        for root, dirs, files in os.walk(build_dir):
+            dirs[:] = [d for d in dirs if d not in self.EXCLUDE_DIRS]
+            if "plugin-context.xml" in files:
+                plugin_context_found = True
+                break
+        if not plugin_context_found:
+            print("❌ [Build] META-INF/spring/plugin-context.xml 누락 — 빌드 전 복원 필요 (PITFALL-06)")
             return None
 
         print(f"🔨 [Build] 빌드 실행: {build_dir}")

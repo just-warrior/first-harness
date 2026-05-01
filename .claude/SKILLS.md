@@ -359,3 +359,78 @@ public class CalculatorAction extends JiraWebActionSupport {
 - [ ] `pom.xml`에 `atlassian-spring-scanner-maven-plugin`이 있다면, 모든 webwork1 액션 클래스에 `@Component`가 선언되어 있는가?
 - [ ] `pom.xml`에 `spring-context`(provided)가 추가되어 있는가?
 - [ ] `@Component`가 있는 클래스에 인스턴스 필드(상태)가 없는가? (singleton 안전 확인)
+- [ ] `src/main/resources/META-INF/spring/plugin-context.xml`이 존재하는가?
+
+---
+
+### [PITFALL-07] `SupportedMethods` / `RequestMethod` 잘못된 패키지 import
+
+**증상:** `atlas-package` 빌드 시 컴파일 에러 발생.
+```
+cannot find symbol
+  symbol:   class SupportedMethods
+  location: package com.atlassian.jira.web.action
+cannot find symbol
+  symbol:   class RequestMethod
+  location: package com.atlassian.jira.web.action
+```
+
+**원인:**
+`SupportedMethods`와 `RequestMethod`는 `com.atlassian.jira.web.action`이 아닌 `com.atlassian.jira.security.request` 패키지에 존재한다.
+
+**올바른 패턴:**
+
+```java
+// ❌ 잘못된 예
+import com.atlassian.jira.web.action.SupportedMethods;
+import com.atlassian.jira.web.action.RequestMethod;
+
+// ✅ 올바른 예
+import com.atlassian.jira.security.request.SupportedMethods;
+import com.atlassian.jira.security.request.RequestMethod;
+```
+
+**체크리스트:**
+- [ ] `SupportedMethods` import가 `com.atlassian.jira.security.request`에서 왔는가?
+- [ ] `RequestMethod` import가 `com.atlassian.jira.security.request`에서 왔는가?
+
+---
+
+### [PITFALL-08] `@Component`가 JiraWebActionSupport 상속 클래스에서 OSGi 클래스 로딩 실패
+
+**증상:** 플러그인 설치 후 Spring 컨테이너 시작 실패.
+```
+BeanDefinitionStoreException: Failed to parse configuration class [CalculatorAction]
+  Caused by: FileNotFoundException: OSGi resource[classpath:com/atlassian/jira/util/I18nHelper.class] cannot be resolved
+```
+
+**원인:**
+Spring 5.x의 `ConfigurationClassPostProcessor`는 `@Component` 어노테이션이 붙은 클래스를 "lite configuration class"로 간주하여 전체 인터페이스 계층의 바이트코드를 읽는다.
+`JiraWebActionSupport`는 `I18nHelper`를 구현하는데, 이 `.class` 파일은 Jira 코어 OSGi 번들에 있고 플러그인 번들의 클래스패스로 접근할 수 없다.
+
+**올바른 패턴:**
+
+`@Component` 제거 + `plugin-context.xml`에 명시적 `<bean>` 선언으로 등록:
+
+```java
+// ❌ 잘못된 예: @Component가 ConfigurationClassParser 스캔을 유발
+@Component
+@SupportedMethods({RequestMethod.GET, RequestMethod.POST})
+public class CalculatorAction extends JiraWebActionSupport { ... }
+
+// ✅ 올바른 예: @Component 없이 plugin-context.xml에서 직접 등록
+@SupportedMethods({RequestMethod.GET, RequestMethod.POST})
+public class CalculatorAction extends JiraWebActionSupport { ... }
+```
+
+```xml
+<!-- plugin-context.xml: scan-indexes 대신 명시적 bean 선언 -->
+<beans xmlns="http://www.springframework.org/schema/beans" ...>
+    <bean id="calculatorAction" class="com.example.jiracalculator.action.CalculatorAction"/>
+</beans>
+```
+
+**체크리스트:**
+- [ ] `JiraWebActionSupport`를 상속하는 Action 클래스에 `@Component`가 없는가?
+- [ ] `plugin-context.xml`에 Action bean이 `<bean>` 태그로 명시적으로 선언되어 있는가?
+- [ ] `plugin-context.xml`에 `<atlassian-scanner:scan-indexes/>`만 있고 `<bean>` 선언이 없는 상태가 아닌가?
