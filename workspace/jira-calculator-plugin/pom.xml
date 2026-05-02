@@ -1,30 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.example</groupId>
     <artifactId>jira-calculator-plugin</artifactId>
-    <version>1.0.3</version>
+    <version>1.1.0</version>
     <packaging>atlassian-plugin</packaging>
 
-    <name>Jira Admin Calculator Plugin</name>
-    <description>A standard calculator plugin for Jira administrators.</description>
+    <name>Jira Calculator Plugin</name>
+    <description>A calculator for Jira administrators</description>
 
     <properties>
         <jira.version>10.3.4</jira.version>
         <amps.version>9.1.1</amps.version>
-        <spring.scanner.version>3.0.0</spring.scanner.version>
+        <atlassian.spring.scanner.version>3.0.0</atlassian.spring.scanner.version>
+        <atlassian.plugin.key>${project.groupId}.${project.artifactId}</atlassian.plugin.key>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
-        <atlassian.plugin.key>${project.groupId}.${project.artifactId}</atlassian.plugin.key>
     </properties>
 
     <dependencies>
-        <!-- Jira API -->
         <dependency>
             <groupId>com.atlassian.jira</groupId>
             <artifactId>jira-api</artifactId>
@@ -32,15 +30,7 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- JAX-RS 2.x (javax, not jakarta) — PITFALL-03 준수 -->
-        <dependency>
-            <groupId>javax.ws.rs</groupId>
-            <artifactId>javax.ws.rs-api</artifactId>
-            <version>2.1.1</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- WebWork — PITFALL-04 준수 -->
+        <!-- WebWork parent class resolution (PITFALL-04) -->
         <dependency>
             <groupId>opensymphony</groupId>
             <artifactId>webwork</artifactId>
@@ -48,7 +38,15 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- Spring Context — PITFALL-06: @Component 사용을 위해 필요 -->
+        <!-- JAX-RS 2.x — javax namespace only (PITFALL-03, Skill 8) -->
+        <dependency>
+            <groupId>javax.ws.rs</groupId>
+            <artifactId>javax.ws.rs-api</artifactId>
+            <version>2.1.1</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Spring Context for explicit bean registration (PITFALL-08) -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
@@ -56,20 +54,20 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- Spring Scanner -->
+        <!-- Spring Scanner annotations -->
         <dependency>
             <groupId>com.atlassian.plugin</groupId>
             <artifactId>atlassian-spring-scanner-annotation</artifactId>
-            <version>${spring.scanner.version}</version>
+            <version>${atlassian.spring.scanner.version}</version>
             <scope>provided</scope>
         </dependency>
 
-        <!-- Test -->
+        <!-- Jackson for JSON serialization in REST -->
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.13.2</version>
-            <scope>test</scope>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.15.2</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
@@ -86,18 +84,15 @@
                     <enableQuickReload>true</enableQuickReload>
                     <instructions>
                         <Atlassian-Plugin-Key>${atlassian.plugin.key}</Atlassian-Plugin-Key>
-                        <Export-Package/>
+                        <!-- version="*" 절대 금지 (PITFALL-02). jakarta.* 전부 금지 (Skill 8). -->
                         <Import-Package>
                             com.atlassian.jira.web.action,
                             webwork.action,
                             javax.ws.rs,
                             javax.ws.rs.core,
-                            javax.ws.rs.ext,
-                            org.springframework.stereotype,
-                            org.slf4j,
                             *
                         </Import-Package>
-                        <Spring-Scanner-Version>${spring.scanner.version}</Spring-Scanner-Version>
+                        <Spring-Context>*</Spring-Context>
                     </instructions>
                 </configuration>
             </plugin>
@@ -105,7 +100,7 @@
             <plugin>
                 <groupId>com.atlassian.plugin</groupId>
                 <artifactId>atlassian-spring-scanner-maven-plugin</artifactId>
-                <version>${spring.scanner.version}</version>
+                <version>${atlassian.spring.scanner.version}</version>
                 <executions>
                     <execution>
                         <phase>process-classes</phase>
@@ -114,15 +109,6 @@
                         </goals>
                     </execution>
                 </executions>
-                <configuration>
-                    <scannedDependencies>
-                        <dependency>
-                            <groupId>com.atlassian.plugin</groupId>
-                            <artifactId>atlassian-spring-scanner-external-jar</artifactId>
-                        </dependency>
-                    </scannedDependencies>
-                    <verbose>false</verbose>
-                </configuration>
             </plugin>
         </plugins>
     </build>

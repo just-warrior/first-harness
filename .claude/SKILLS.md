@@ -237,7 +237,7 @@ OSGi는 직접 import한 패키지뿐 아니라 **클래스 계층에서 간접 
 
 ## 🏗 Skill 6: OSGi Dependency Injection (The P2 Way)
 - **Component Import**: Jira 코어가 제공하는 빈(예: `UserManager`, `ProjectManager`)을 서비스 클래스에서 주입받으려면 반드시 생성자 파라미터에 `@ComponentImport`를 붙여야 합니다.
-- **Rules**: `pom.xml`의 `maven-jira-plugin` 설정 중 `<Import-Package>`에 해당 API 패키지가 포함되어 있는지 반드시 확인하십시오.
+- **Rules**: `pom.xml`의 `jira-maven-plugin` 설정 중 `<Import-Package>`에 해당 API 패키지가 포함되어 있는지 반드시 확인하십시오.
 
 ## 🏢 Skill 7: Modern Injection Rules
 - **Standard**: 모든 비즈니스 로직(Service/Component)은 `@Named`와 생성자 주입(`@Inject`)을 사용하십시오.

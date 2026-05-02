@@ -1,63 +1,82 @@
+## Jira Admin Calculator — Velocity Template
+## Decorator: atl.admin (Skill 3)
 <html>
 <head>
+    <title>$i18n.getText("calculator.page.title")</title>
     <meta name="decorator" content="atl.admin"/>
     <meta name="admin.active.section" content="admin_plugins_menu/calculator-section"/>
-    <title>Calculator</title>
     $webResourceManager.requireResource("com.example.jira-calculator-plugin:calculator-resources")
 </head>
 <body>
+
 <section id="content" role="main">
+
     <header class="aui-page-header">
         <div class="aui-page-header-inner">
             <div class="aui-page-header-main">
-                <h1>Calculator</h1>
+                <h1>$i18n.getText("calculator.page.title")</h1>
             </div>
         </div>
     </header>
+
     <div class="aui-page-panel">
         <div class="aui-page-panel-inner">
-            <section class="aui-page-panel-content">
+            <div class="aui-page-panel-content">
 
                 <div id="calculator-wrapper">
-                    <div class="calc-display" id="calc-display">0</div>
+
+                    <!-- Display -->
+                    <div id="calc-display" aria-live="polite">0</div>
+
+                    <!-- Button Grid — data-action/data-value only, no aui-button (PITFALL-05) -->
                     <div class="calc-grid">
-                        <!-- Row 1: C (span 3), / -->
-                        <button class="calc-btn calc-btn-action calc-btn-clear" data-action="clear">C</button>
-                        <button class="calc-btn calc-btn-operator" data-action="operator" data-value="/">/</button>
+
+                        <!-- Row 1: C, ±, %, / -->
+                        <button class="calc-btn calc-btn-action" data-action="clear">C</button>
+                        <button class="calc-btn calc-btn-action" data-action="sign">&#177;</button>
+                        <button class="calc-btn calc-btn-action" data-action="percent">%</button>
+                        <button class="calc-btn calc-btn-operator" data-action="operator" data-value="/">&divide;</button>
 
                         <!-- Row 2: 7, 8, 9, * -->
-                        <button class="calc-btn calc-btn-number" data-action="number" data-value="7">7</button>
-                        <button class="calc-btn calc-btn-number" data-action="number" data-value="8">8</button>
-                        <button class="calc-btn calc-btn-number" data-action="number" data-value="9">9</button>
-                        <button class="calc-btn calc-btn-operator" data-action="operator" data-value="*">*</button>
+                        <button class="calc-btn calc-btn-number" data-action="digit" data-value="7">7</button>
+                        <button class="calc-btn calc-btn-number" data-action="digit" data-value="8">8</button>
+                        <button class="calc-btn calc-btn-number" data-action="digit" data-value="9">9</button>
+                        <button class="calc-btn calc-btn-operator" data-action="operator" data-value="*">&times;</button>
 
                         <!-- Row 3: 4, 5, 6, - -->
-                        <button class="calc-btn calc-btn-number" data-action="number" data-value="4">4</button>
-                        <button class="calc-btn calc-btn-number" data-action="number" data-value="5">5</button>
-                        <button class="calc-btn calc-btn-number" data-action="number" data-value="6">6</button>
-                        <button class="calc-btn calc-btn-operator" data-action="operator" data-value="-">-</button>
+                        <button class="calc-btn calc-btn-number" data-action="digit" data-value="4">4</button>
+                        <button class="calc-btn calc-btn-number" data-action="digit" data-value="5">5</button>
+                        <button class="calc-btn calc-btn-number" data-action="digit" data-value="6">6</button>
+                        <button class="calc-btn calc-btn-operator" data-action="operator" data-value="-">&minus;</button>
 
                         <!-- Row 4: 1, 2, 3, + -->
-                        <button class="calc-btn calc-btn-number" data-action="number" data-value="1">1</button>
-                        <button class="calc-btn calc-btn-number" data-action="number" data-value="2">2</button>
-                        <button class="calc-btn calc-btn-number" data-action="number" data-value="3">3</button>
+                        <button class="calc-btn calc-btn-number" data-action="digit" data-value="1">1</button>
+                        <button class="calc-btn calc-btn-number" data-action="digit" data-value="2">2</button>
+                        <button class="calc-btn calc-btn-number" data-action="digit" data-value="3">3</button>
                         <button class="calc-btn calc-btn-operator" data-action="operator" data-value="+">+</button>
 
-                        <!-- Row 5: 0 (span 2), ., = -->
-                        <button class="calc-btn calc-btn-number calc-btn-zero" data-action="number" data-value="0">0</button>
+                        <!-- Row 5: 0(span 2), ., = -->
+                        <button class="calc-btn calc-btn-number calc-btn-zero" data-action="digit" data-value="0">0</button>
                         <button class="calc-btn calc-btn-number" data-action="decimal">.</button>
                         <button class="calc-btn calc-btn-equals" data-action="equals">=</button>
+
+                    </div><!-- /.calc-grid -->
+
+                    <!-- History Panel (max 5 entries) -->
+                    <div id="calc-history-panel">
+                        <h3>$i18n.getText("calculator.history.title")</h3>
+                        <ul id="calc-history">
+                            <li class="calc-history-empty">$i18n.getText("calculator.history.empty")</li>
+                        </ul>
                     </div>
-                </div>
 
-                <div id="calc-history" class="calc-history">
-                    <h3>History</h3>
-                    <ul id="calc-history-list"></ul>
-                </div>
+                </div><!-- /#calculator-wrapper -->
 
-            </section>
+            </div>
         </div>
     </div>
+
 </section>
+
 </body>
 </html>

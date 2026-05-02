@@ -1,42 +1,34 @@
-<atlassian-plugin key="${atlassian.plugin.key}" name="Jira Calculator Plugin" plugins-version="2">
+<?xml version="1.0" encoding="UTF-8"?>
+<atlassian-plugin key="${atlassian.plugin.key}" name="${project.name}" plugins-version="2">
 
     <plugin-info>
-        <description>Jira 관리자 화면에서 사용할 수 있는 사칙연산 계산기 플러그인</description>
+        <description>${project.description}</description>
         <version>${project.version}</version>
-        <vendor name="Example Corp" url="http://example.com"/>
-        <param name="atlassian-data-center-status">compatible</param>
+        <vendor name="Example" url="https://www.example.com"/>
+        <param name="plugin-icon">images/pluginIcon.png</param>
+        <param name="plugin-logo">images/pluginLogo.png</param>
     </plugin-info>
 
-    <!-- i18n 리소스 -->
+    <!-- i18n resource -->
     <resource type="i18n" name="i18n" location="jira-calculator-plugin"/>
 
-    <!-- 관리자 좌측 사이드바 섹션 (admin_plugins_menu 내부) -->
+    <!-- 관리자 사이드바 섹션 (Skill 3) -->
     <web-section key="calculator-section"
                  location="admin_plugins_menu"
                  weight="100">
         <label key="calculator.menu.section.label"/>
     </web-section>
 
-    <!-- 사이드바 메뉴 아이템 — PITFALL-01: !default.jspa suffix 필수 -->
+    <!-- 관리자 사이드바 메뉴 항목 — !default.jspa 필수 (PITFALL-01) -->
     <web-item key="calculator-web-item"
-              name="Calculator"
               section="admin_plugins_menu/calculator-section"
               weight="10">
         <label key="calculator.menu.item.label"/>
         <link linkId="calculator-link">/secure/CalculatorAction!default.jspa</link>
     </web-item>
 
-    <!-- CSS / JS 웹 리소스 -->
-    <web-resource key="calculator-resources" name="Calculator Resources">
-        <resource type="download" name="jira-calculator-plugin.css"
-                  location="/css/jira-calculator-plugin.css"/>
-        <resource type="download" name="jira-calculator-plugin.js"
-                  location="/js/jira-calculator-plugin.js"/>
-        <context>calculator</context>
-    </web-resource>
-
-    <!-- WebWork1 Action — CalculatorAction 뷰 라우터 -->
-    <webwork1 key="calculator-webwork" name="Calculator WebWork Action" roles-required="admin">
+    <!-- WebWork1 액션 모듈 -->
+    <webwork1 key="calculator-action" name="Calculator Action" roles-required="admin">
         <actions>
             <action name="com.example.jiracalculator.action.CalculatorAction"
                     alias="CalculatorAction">
@@ -47,13 +39,20 @@
         </actions>
     </webwork1>
 
-    <!-- REST 모듈 — /rest/calculator/1.0/calculate -->
+    <!-- JAX-RS REST 모듈 -->
     <rest key="calculator-rest"
-          name="Calculator REST API"
           path="/calculator"
           version="1.0">
-        <description>Calculator REST API for arithmetic operations</description>
-        <package>com.example.jiracalculator.rest</package>
+        <description>Calculator REST API</description>
     </rest>
+
+    <!-- CSS/JS 웹 리소스 -->
+    <web-resource key="calculator-resources" name="Calculator Resources">
+        <resource type="download" name="jira-calculator-plugin.css"
+                  location="/css/jira-calculator-plugin.css"/>
+        <resource type="download" name="jira-calculator-plugin.js"
+                  location="/js/jira-calculator-plugin.js"/>
+        <context>atl.admin</context>
+    </web-resource>
 
 </atlassian-plugin>

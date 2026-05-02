@@ -1,10 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:atlassian-scanner="http://www.atlassian.com/schema/atlassian-scanner/2"
        xsi:schemaLocation="
-       http://www.springframework.org/schema/beans
-       http://www.springframework.org/schema/beans/spring-beans-2.5.xsd">
+           http://www.springframework.org/schema/beans
+           http://www.springframework.org/schema/beans/spring-beans.xsd
+           http://www.atlassian.com/schema/atlassian-scanner/2
+           http://www.atlassian.com/schema/atlassian-scanner/2/atlassian-scanner.xsd">
 
-    <bean id="calculatorAction" class="com.example.jiracalculator.action.CalculatorAction"/>
+    <!-- Spring Scanner 인덱스 로드 (Skill 2) -->
+    <atlassian-scanner:scan-indexes/>
+
+    <!--
+        CalculatorAction은 JiraWebActionSupport 상속으로 인해 @Component 사용 불가 (PITFALL-08).
+        ConfigurationClassParser가 I18nHelper 등 OSGi 외부 클래스를 탐색하다 실패하기 때문.
+        명시적 <bean> 선언으로 Spring 컨테이너를 초기화한다.
+    -->
+    <bean id="calculatorAction"
+          class="com.example.jiracalculator.action.CalculatorAction"/>
 
 </beans>
